@@ -103,9 +103,13 @@ vérifient qu'elle correspond au secret.
 - un coureur ne peut être exclu qu'après **60 secondes d'absence réelle**, ou
   après avoir signé lui-même son départ.
 
-`npm run test:rules` lance **29 sondes** contre l'émulateur, avec ces règles et
+`npm run test:rules` lance **34 sondes** contre l'émulateur, avec ces règles et
 de vraies identités de joueurs — chacune correspond à une attaque qu'un client
-modifié pourrait réellement tenter.
+modifié pourrait réellement tenter. Elles ont déjà trouvé deux failles réelles
+avant toute mise en ligne : un joueur sans enregistrement de présence traité
+comme absent, et surtout une **propagation de règle** — un `.write` accordé sur
+`secrets/{code}` s'appliquait à tous ses descendants, ce qui annulait le verrou
+« écrite une seule fois » et permettait de réécrire le paquet en pleine course.
 
 ### Limite connue et assumée
 
@@ -140,6 +144,10 @@ npx firebase deploy --only database
 
 ou, sans outillage : coller le contenu de `database.rules.json` dans
 **Console → Realtime Database → Règles → Publier**.
+
+> À refaire après toute modification de `scripts/build-rules.mjs`. Les règles
+> publiées ne sont pas versionnées côté Firebase : seul le fichier du dépôt
+> fait foi, et lui seul est couvert par les sondes.
 
 Pour savoir où en est le projet réel à tout moment :
 

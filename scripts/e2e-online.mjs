@@ -1,19 +1,23 @@
-// End-to-end test of the online mode against the Firebase emulators.
+// End-to-end test of the online mode.
 //
-// Boots Auth + Realtime Database (with the real security rules) and a Vite
-// server, then drives real Chromium pages — real "phones" — through real UI
-// interactions: create, share the code, join, auto-start, play a full race,
-// refresh mid-race, and check that every device agrees on the board.
+// Drives real Chromium pages — real "phones" — through real UI interactions:
+// create, share the code, join, auto-start, play a full race, refresh
+// mid-race, chain into the next race, and abandon. Checks that every device
+// agrees on the board throughout.
 //
-//   npm run e2e:online
+//   npm run e2e:online          # against the Firebase emulators (default)
+//   npm run e2e:online -- --live  # against the REAL project
 //
-// Requires Java (the database emulator) and Chromium via Playwright.
+// The emulator run needs Java. The live run needs the rules deployed, writes
+// a handful of records to the real database, and deletes them on the way out.
+// Both need Chromium via Playwright.
 
 import { spawn } from "node:child_process";
 import process from "node:process";
 import { chromium } from "playwright";
 import { emulatorEnv, startEmulators, waitForHttp } from "./emulators.mjs";
 
+const LIVE = process.argv.includes("--live");
 const VITE_PORT = 8123;
 const BASE = `http://127.0.0.1:${VITE_PORT}/`;
 
@@ -43,18 +47,22 @@ const until = async (read, timeoutMs = 20_000, step = 250) => {
 };
 
 const main = async () => {
-  console.log("démarrage des émulateurs…");
-  const emulators = await startEmulators();
+  let emulators = { stop: () => {} };
+  if (LIVE) {
+    console.log("cible : PROJET RÉEL (les règles doivent y être déployées)");
+  } else {
+    console.log("démarrage des émulateurs…");
+    emulators = await startEmulators();
+  }
 
   console.log("démarrage du serveur de développement…");
+  const viteEnv = LIVE
+    ? { ...process.env }
+    : { ...emulatorEnv(), VITE_FIREBASE_EMULATORS: "1" };
   const vite = spawn(
     "npx",
     ["vite", "--port", String(VITE_PORT), "--host", "127.0.0.1"],
-    {
-      stdio: ["ignore", "pipe", "pipe"],
-      detached: true,
-      env: { ...emulatorEnv(), VITE_FIREBASE_EMULATORS: "1" },
-    }
+    { stdio: ["ignore", "pipe", "pipe"], detached: true, env: viteEnv }
   );
   const stopVite = () => {
     try {
@@ -70,6 +78,12 @@ const main = async () => {
 
     browser = await chromium.launch({
       executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium",
+      // Reaching the real Firebase means going through the sandbox proxy;
+      // the local dev server and emulators must bypass it.
+      proxy:
+        LIVE && process.env.HTTPS_PROXY
+          ? { server: process.env.HTTPS_PROXY, bypass: "127.0.0.1,localhost" }
+          : undefined,
     });
 
     /** One phone. Each gets its own context so the anonymous uids differ. */
@@ -297,6 +311,21 @@ const main = async () => {
       40_000
     );
     check(!!hostSawEnd, "le départ d'un joueur met fin à un duel");
+    if (LIVE && code) {
+      // Leave the real database as we found it.
+      const removed = await host.page
+        .evaluate(async (gameCode) => {
+          const fb = window.__fsdb;
+          if (!fb) return false;
+          await fb.update(fb.ref(fb.db), {
+            [`games/${gameCode}`]: null,
+            [`secrets/${gameCode}`]: null,
+          });
+          return true;
+        }, code)
+        .catch(() => false);
+      check(removed, "la partie de test est effacée de la base réelle");
+    }
   } finally {
     if (browser) await browser.close().catch(() => undefined);
     stopVite();

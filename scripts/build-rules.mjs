@@ -63,6 +63,14 @@ const isAbsent = (seat) =>
 /** `seat` signed their own intent to leave. */
 const hasLeft = (seat) => `${game(`/leave/' + ${seat} + '`)}.val() === true`;
 
+/**
+ * A race that is finished, or a lobby that never started — the only moments at
+ * which a member may sweep it out of the database. Without this, every race
+ * ever played piles up forever: the create rule below is write-once, so nothing
+ * could ever be removed.
+ */
+const isDisposable = `(${game("/result")}.exists() || !${game("/start")}.exists())`;
+
 const newSeat = "newData.child('seat').val()";
 const newType = "newData.child('type').val()";
 const secretAt = (refExpr) =>
@@ -129,13 +137,19 @@ const rules = {
       $code: {
         // Only the people at the table can watch it.
         ".read": `auth != null && ${isMember}`,
-        // Creating a race: the whole node appears at once, with the author in
-        // seat 0 and nothing already there.
+        // Two things only: creating a race — the whole node appears at once,
+        // with the author in seat 0 and nothing already there — and removing a
+        // finished one. Note this grant cascades to descendants, but only ever
+        // when the WHOLE node is going away: deleting a single child leaves
+        // `newData` at this path existing, so the branch does not apply.
         ".write":
-          `auth != null && !data.exists() && newData.exists() && ` +
+          "auth != null && (" +
+          `(!data.exists() && newData.exists() && ` +
           `newData.child('seats/0/uid').val() === auth.uid && ` +
           `newData.child('state/course').val() === 'c1' && ` +
-          `newData.child('state/actor').val() === '0'`,
+          `newData.child('state/actor').val() === '0') || ` +
+          `(!newData.exists() && ${isMember} && ${isDisposable})` +
+          ")",
 
         lobby: {
           // Readable by anyone signed in: joining needs the head count before
@@ -295,14 +309,23 @@ const rules = {
 
     secrets: {
       $code: {
-        // The deal arrives with the race, or with a later course from someone
-        // at the table. It is never readable in bulk, at any point.
-        ".write":
-          `auth != null && ((!data.exists() && newData.exists() && !${game("")}.exists()) || ${isMember})`,
+        // DELETION ONLY at this level, and never a blanket grant.
+        //
+        // Database rules cascade: a `.write` granted here would grant it on
+        // every descendant, whatever their own rules say — which would defeat
+        // the write-once rule below entirely. A seated player could then
+        // rewrite a deck mid-course and publish values matching their new
+        // deck, and the per-action `value === secret` check would pass
+        // happily. A probe caught precisely that; keep this branch narrow.
+        ".write": `auth != null && !newData.exists() && ${isMember} && ${isDisposable}`,
         $c: {
           // Write-once per course: a dealt deck can never be rewritten under
-          // players who have already drawn from it.
-          ".write": `auth != null && !data.exists() && ${isMember}`,
+          // players who have already drawn from it. The second branch covers
+          // the deal that arrives *with* a brand new race, when no seat exists
+          // yet in the pre-write tree to prove membership.
+          ".write":
+            `auth != null && !data.exists() && ` +
+            `(${isMember} || !${game("")}.exists())`,
           d: {
             $idx: {
               // The single most important rule in the file: a client may read

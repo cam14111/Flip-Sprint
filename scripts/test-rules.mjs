@@ -367,6 +367,49 @@ const main = async () => {
       ),
       "rejoindre une partie déjà commencée est refusé"
     );
+
+    // ---------------------------------------------------------------------
+    // Realtime Database rules CASCADE: a `.write` granted on a parent grants
+    // it on every descendant, whatever their own rules say. A blanket grant
+    // high in the secrets tree would therefore let a seated player rewrite a
+    // deck mid-course — and publish values matching their new deck, which the
+    // per-action check would happily accept.
+    console.log("\ncascade des règles sur les secrets");
+    check(
+      await denied(() =>
+        set(ref(alice.db, `secrets/${code}/c1/d/40`), 12)
+      ),
+      "réécrire une carte du paquet en cours est refusé"
+    );
+    check(
+      await denied(() =>
+        set(ref(alice.db, `secrets/${code}/c1`), { d: { 0: 12, 1: 12 } })
+      ),
+      "réécrire tout le paquet d'une course est refusé"
+    );
+    check(
+      await denied(() => set(ref(alice.db, `secrets/${code}`), { c1: { d: { 0: 12 } } })),
+      "réécrire l'arbre des secrets est refusé"
+    );
+
+    // ---------------------------------------------------------------------
+    // Finished games must be removable, or every race ever played piles up.
+    console.log("\nménage");
+    const spare = "CCCCCC";
+    await createRace(alice, spare, 2);
+    check(
+      await allowed(() =>
+        update(ref(alice.db), {
+          [`games/${spare}`]: null,
+          [`secrets/${spare}`]: null,
+        })
+      ),
+      "un salon jamais démarré peut être effacé"
+    );
+    check(
+      await denied(() => set(ref(mallory.db, `games/${code}`), null)),
+      "un inconnu ne peut pas effacer une partie"
+    );
   } finally {
     for (const client of [alice, bob, mallory]) {
       if (client) await deleteApp(client.app).catch(() => undefined);
