@@ -1,0 +1,352 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---------------------------------------------------------------------------
+   Flip Sprint — "night track" surface.
+   The app runs permanently in dark mode; the token set below is tuned to the
+   indigo/violet night rather than the neutral slate shadcn ships with.
+   --------------------------------------------------------------------------- */
+
+@layer base {
+  :root {
+    --background: 260 62% 10%;
+    --foreground: 250 40% 98%;
+    --card: 260 50% 15%;
+    --card-foreground: 250 40% 98%;
+    --popover: 262 55% 12%;
+    --popover-foreground: 250 40% 98%;
+    --primary: 187 92% 53%; /* neon cyan */
+    --primary-foreground: 262 60% 10%;
+    --secondary: 262 32% 24%;
+    --secondary-foreground: 250 40% 98%;
+    --muted: 262 30% 22%;
+    --muted-foreground: 255 20% 72%;
+    --accent: 330 82% 70%; /* neon magenta */
+    --accent-foreground: 262 60% 10%;
+    --destructive: 350 80% 58%;
+    --destructive-foreground: 250 40% 98%;
+    --border: 262 30% 26%;
+    --input: 262 30% 28%;
+    --ring: 187 92% 53%;
+    --radius: 0.85rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  /* Solid indigo base (matches the manifest background/theme colour) so no
+     area is ever pure black — including any OS-drawn letterbox behind a camera
+     cutout or status bar that CSS on <body> can't reach. */
+  html {
+    background-color: #12082e;
+  }
+  body {
+    @apply text-foreground;
+    margin: 0;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+    font-family: theme("fontFamily.display");
+    /* The track gradient lives on the root and is fixed to the viewport, so it
+       fills the ENTIRE physical screen — including behind the status bar and
+       camera cutout in fullscreen — with no seam. */
+    background:
+      radial-gradient(1100px 560px at 50% -10%, #2a1160 0%, transparent 62%),
+      radial-gradient(820px 480px at 100% 104%, #5a1450 0%, transparent 58%),
+      radial-gradient(700px 420px at 0% 96%, #08324a 0%, transparent 55%),
+      linear-gradient(165deg, #150a35 0%, #0e0626 58%, #0a0520 100%);
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+  }
+}
+
+/* App containers stay transparent so the single fixed root gradient shows
+   through seamlessly across the whole screen. */
+.app-bg {
+  background: transparent;
+}
+
+/* ---- 3D card flip --------------------------------------------------------- */
+.perspective {
+  perspective: 900px;
+}
+.preserve-3d {
+  transform-style: preserve-3d;
+}
+.backface-hidden {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+/* ---- Motion --------------------------------------------------------------- */
+
+/* A card sliding out of the deck into the runner's lane. */
+@keyframes sprint-in {
+  0% {
+    opacity: 0;
+    transform: translate(var(--from-x, 0), var(--from-y, -46px)) scale(0.82)
+      rotate(-7deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(0, 0) scale(1) rotate(0deg);
+  }
+}
+.animate-sprint-in {
+  animation: sprint-in 0.4s cubic-bezier(0.2, 0.8, 0.3, 1) backwards;
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.animate-pop {
+  animation: pop 0.32s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+/* "Crampe" — the runner busted: a hard shake, then the lane collapses. */
+@keyframes cramp-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  15% {
+    transform: translateX(-9px) rotate(-1.5deg);
+  }
+  30% {
+    transform: translateX(8px) rotate(1.5deg);
+  }
+  45% {
+    transform: translateX(-6px) rotate(-1deg);
+  }
+  60% {
+    transform: translateX(5px) rotate(1deg);
+  }
+  80% {
+    transform: translateX(-2px);
+  }
+}
+.animate-cramp {
+  animation: cramp-shake 0.52s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes collapse-out {
+  0% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.72) translateY(26px) rotate(8deg);
+    opacity: 0;
+  }
+}
+.animate-collapse {
+  animation: collapse-out 0.44s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+/* "Sprint parfait" — 7 unique numbers: a golden flash across the lane. */
+@keyframes perfect-flash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
+    filter: brightness(1);
+  }
+  25% {
+    box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.95),
+      0 0 40px 12px rgba(251, 191, 36, 0.55);
+    filter: brightness(1.35);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
+    filter: brightness(1);
+  }
+}
+.animate-perfect {
+  animation: perfect-flash 1.1s ease-out forwards;
+}
+
+/* "Coup de sifflet" — a cyan shockwave over the targeted lane. */
+@keyframes whistle-wave {
+  0% {
+    box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.7);
+  }
+  100% {
+    box-shadow: 0 0 0 26px rgba(34, 211, 238, 0);
+  }
+}
+.animate-whistle {
+  animation: whistle-wave 0.7s ease-out;
+}
+
+/* Idle pulse marking a legal target (a runner you may whistle or burst). */
+@keyframes pulse-ring {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(34, 211, 238, 0);
+  }
+}
+.animate-pulse-ring {
+  animation: pulse-ring 1.6s ease-out infinite;
+}
+
+/* One-shot glow spotlighting the card the last move produced. */
+@keyframes last-action {
+  0% {
+    box-shadow: 0 0 0 0 rgba(244, 114, 182, 0);
+  }
+  12% {
+    box-shadow: 0 0 0 3px rgba(244, 114, 182, 0.95),
+      0 0 22px 6px rgba(244, 114, 182, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 3px rgba(244, 114, 182, 0.8),
+      0 0 16px 4px rgba(244, 114, 182, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 0 2px rgba(244, 114, 182, 0),
+      0 0 0 0 rgba(244, 114, 182, 0);
+  }
+}
+.animate-last-action {
+  animation: last-action 1.6s ease-out forwards;
+}
+
+@keyframes board-in {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-board-in {
+  animation: board-in 0.38s cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@keyframes float-up {
+  0% {
+    transform: translateY(6px);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.animate-float-up {
+  animation: float-up 0.3s ease-out;
+}
+
+/* Speed lines behind a lane, intensifying as the runner pushes their luck. */
+@keyframes speed-lines {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: -120px 0;
+  }
+}
+.speed-lines::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: var(--speed, 0);
+  background-image: repeating-linear-gradient(
+    100deg,
+    rgba(255, 255, 255, 0.16) 0px,
+    rgba(255, 255, 255, 0.16) 2px,
+    transparent 2px,
+    transparent 14px
+  );
+  animation: speed-lines 0.55s linear infinite;
+  transition: opacity 0.4s ease-out;
+}
+
+/* ---- Responsive scale factors --------------------------------------------
+   Lanes are laid out at a fixed pixel size and visually scaled by these
+   factors (see ui/ScaledBox), so the whole table always fits without ever
+   scrolling the play surface. Tuned down on short viewports. */
+:root {
+  --lane-me: 1;
+  --lane-rival: 0.62;
+}
+@media (max-height: 780px) {
+  :root {
+    --lane-me: 0.92;
+    --lane-rival: 0.56;
+  }
+}
+@media (max-height: 720px) {
+  :root {
+    --lane-me: 0.84;
+    --lane-rival: 0.5;
+  }
+}
+@media (max-height: 660px) {
+  :root {
+    --lane-me: 0.75;
+    --lane-rival: 0.45;
+  }
+}
+@media (max-height: 600px) {
+  :root {
+    --lane-me: 0.66;
+    --lane-rival: 0.4;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-sprint-in,
+  .animate-pop,
+  .animate-cramp,
+  .animate-collapse,
+  .animate-perfect,
+  .animate-whistle,
+  .animate-pulse-ring,
+  .animate-last-action,
+  .animate-board-in,
+  .animate-float-up {
+    animation: none !important;
+  }
+  .speed-lines::before {
+    animation: none !important;
+    opacity: 0 !important;
+  }
+  .flip-transition {
+    transition: none !important;
+  }
+}
+
+/* Hide scrollbars on the game surface but keep scrollability. */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

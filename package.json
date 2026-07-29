@@ -1,0 +1,52 @@
+{
+  "name": "flip-sprint",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b --noEmit && vite build",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "preview": "vite preview",
+    "generate:icons": "node scripts/generate-icons.mjs",
+    "e2e:online": "node scripts/e2e-online.mjs",
+    "e2e:online:fast": "node scripts/e2e-online.mjs --fast"
+  },
+  "dependencies": {
+    "@radix-ui/react-dialog": "^1.1.2",
+    "@radix-ui/react-label": "^2.1.0",
+    "@radix-ui/react-slot": "^1.1.0",
+    "@radix-ui/react-switch": "^1.1.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "firebase": "^12.16.0",
+    "lucide-react": "^0.462.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "tailwind-merge": "^2.5.2"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.9.0",
+    "@types/node": "^22.5.5",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react-swc": "^3.5.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.9.0",
+    "eslint-plugin-react-hooks": "^5.1.0-rc.0",
+    "eslint-plugin-react-refresh": "^0.4.9",
+    "firebase-tools": "^15.23.0",
+    "globals": "^15.9.0",
+    "playwright": "^1.61.1",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.11",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "^5.5.3",
+    "typescript-eslint": "^8.0.1",
+    "vite": "^5.4.1",
+    "vite-plugin-pwa": "^0.21.2",
+    "vitest": "^2.1.9"
+  }
+}
