@@ -18,6 +18,7 @@ import { useOnlineGame } from "@/hooks/useOnlineGame";
 import { cn } from "@/lib/utils";
 import { GameScreen } from "./GameScreen";
 import { Overlays } from "./Overlays";
+import { Panel } from "./screens/Panel";
 
 const ERROR_TEXT: Record<OnlineErrorCode, string> = {
   "not-found": "Aucune partie ne porte ce code.",
@@ -138,6 +139,7 @@ export const OnlineMode = ({
   const { stage, snap } = online;
   const [codeInput, setCodeInput] = useState("");
   const [copied, setCopied] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const me = displayName(settings.playerName);
 
   // Act on the intent that brought us here — an invite link, or a race this
@@ -363,10 +365,59 @@ export const OnlineMode = ({
 
   return (
     <>
+      {menuOpen && (
+        <Panel title={UI.menu} onClose={() => setMenuOpen(false)}>
+          <div className="mx-auto max-w-md space-y-2">
+            <p className="rounded-xl bg-white/[0.04] px-3 py-2 text-center text-sm text-white/60">
+              Code de la partie{" "}
+              <span className="font-black tracking-widest text-neon-cyan">
+                {snap.code}
+              </span>
+            </p>
+            <Button
+              variant="primary"
+              size="lg"
+              className="w-full"
+              onClick={() => setMenuOpen(false)}
+            >
+              {UI.resume}
+            </Button>
+            <Button
+              variant="ghost"
+              size="lg"
+              className="w-full"
+              onClick={() => {
+                setMenuOpen(false);
+                online.detach();
+                onExit();
+              }}
+            >
+              Revenir à l'accueil
+            </Button>
+            <p className="px-1 pt-2 text-[12px] leading-snug text-white/40">
+              Revenir à l'accueil ne te retire pas de la course : tu peux y
+              revenir à tout moment. Abandonner, si.
+            </p>
+            <Button
+              variant="danger"
+              size="lg"
+              className="w-full"
+              data-testid="abandon"
+              onClick={() => {
+                setMenuOpen(false);
+                void online.abandon().then(onExit);
+              }}
+            >
+              Abandonner la course
+            </Button>
+          </div>
+        </Panel>
+      )}
+
       <GameScreen
         game={snap.game}
         dispatch={online.dispatch}
-        onOpenMenu={online.detach}
+        onOpenMenu={() => setMenuOpen(true)}
         showRisk={settings.showRisk}
         busy={!snap.myTurn}
         presence={snap.players}

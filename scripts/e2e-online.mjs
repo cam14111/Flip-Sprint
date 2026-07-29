@@ -81,6 +81,14 @@ const main = async () => {
       page.on("pageerror", (e) =>
         failures.push(`${label}: erreur de page — ${e.message}`)
       );
+      // Upkeep writes report themselves; surface them so a stalled table
+      // comes with its reason rather than a mystery.
+      page.on("console", (m) => {
+        const text = m.text();
+        if (text.includes("[flip-sprint]")) {
+          console.error(`      ${label} → ${text.slice(0, 220)}`);
+        }
+      });
       return { label, context, page };
     };
 
@@ -234,6 +242,61 @@ const main = async () => {
       30_000
     );
     check(!!resumed, "un rafraîchissement ramène l'invité dans sa course");
+
+    // ---- Next-race handshake ---------------------------------------------
+    console.log("\nenchaînement des courses");
+    await host.page.getByRole("button", { name: "Course suivante" }).click();
+    const hostWaits = await until(
+      async () =>
+        (await host.page.getByText("En attente des autres").count()) > 0,
+      15_000
+    );
+    check(!!hostWaits, "la course suivante attend que tout le monde soit prêt");
+
+    await guest.page.getByRole("button", { name: "Course suivante" }).click();
+
+    // The new race is dealt when the recap is gone on both devices and exactly
+    // one of them has the initiative again. Checking for the "Accélérer"
+    // buttons on a *given* phone would be wrong: the opening card of a course
+    // moves one seat along, so the host may legitimately be the one waiting.
+    const nextDealt = await until(async () => {
+      const recaps =
+        (await host.page.getByText(/Fin de course/).count()) +
+        (await guest.page.getByText(/Fin de course/).count());
+      if (recaps > 0) return false;
+      const [h, g] = await waitCounts();
+      return h + g === 1;
+    }, 30_000);
+    if (!nextDealt) {
+      // Read the database through the page's dev handle: the truth about a
+      // stalled handshake is in `state` and `nextReady`, not on screen.
+      const dump = await host.page.evaluate(async (gameCode) => {
+        const fb = window.__fsdb;
+        if (!fb) return "pas de handle base";
+        const snap = await fb.get(fb.ref(fb.db, `games/${gameCode}`));
+        const value = snap.val() ?? {};
+        return JSON.stringify({
+          state: value.state,
+          nextReady: value.nextReady,
+          courses: Object.keys(value.courses ?? {}),
+          result: value.result,
+        });
+      }, code);
+      console.error(`      base : ${dump}`);
+    }
+    check(!!nextDealt, "la course suivante démarre quand les deux sont prêts");
+
+    // ---- Abandon ----------------------------------------------------------
+    console.log("\nabandon");
+    await guest.page.getByRole("button", { name: "Menu" }).click();
+    await guest.page.getByTestId("abandon").click();
+
+    // Two runners, one leaves: the other is the last one standing.
+    const hostSawEnd = await until(
+      async () => (await host.page.getByText(/Arrivée/).count()) > 0,
+      40_000
+    );
+    check(!!hostSawEnd, "le départ d'un joueur met fin à un duel");
   } finally {
     if (browser) await browser.close().catch(() => undefined);
     stopVite();

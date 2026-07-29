@@ -674,6 +674,16 @@ export class OnlineGame {
 
   private autoActing = false;
 
+  /**
+   * Upkeep writes are best effort — the state they are derived from will still
+   * be there next event, so a failure costs a beat rather than the game. But
+   * swallowing them silently makes a stalled table impossible to diagnose, so
+   * they are always reported.
+   */
+  private reportUpkeep(what: string, error: unknown): void {
+    console.warn(`[flip-sprint] écriture "${what}" refusée :`, error);
+  }
+
   private async maybeAutoAct(): Promise<void> {
     if (this.destroyed || this.autoActing || this.busy) return;
     this.autoActing = true;
@@ -739,7 +749,7 @@ export class OnlineGame {
     await set(ref(this.db, P.start(this.code)), {
       count,
       at: serverTimestamp(),
-    }).catch(() => undefined);
+    }).catch((error) => this.reportUpkeep("start", error));
   }
 
   private async writeResult(state: GameState): Promise<void> {
@@ -749,7 +759,7 @@ export class OnlineGame {
       winner,
       reason: activeCount(state.players) <= 1 ? "abandon" : "score",
       by: wireSeat(this.mySeat),
-    }).catch(() => undefined);
+    }).catch((error) => this.reportUpkeep("result", error));
   }
 
   private async dealNextCourse(next: number): Promise<void> {
@@ -777,7 +787,7 @@ export class OnlineGame {
       [P.secretCourse(this.code, key)]: deal.secrets,
       [P.state(this.code)]: state,
       [P.nextReady(this.code)]: null, // clear the handshake for the new race
-    }).catch(() => undefined);
+    }).catch((error) => this.reportUpkeep(`deal ${key}`, error));
   }
 
   // -------------------------------------------------------------------------
