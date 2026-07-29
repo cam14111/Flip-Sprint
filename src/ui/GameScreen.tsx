@@ -41,6 +41,26 @@ const prompt = (game: GameState): string => {
   }
 };
 
+/**
+ * True on a screen with room to spare in both directions — a tablet or a
+ * desktop. The board is designed for a thumb, so the extra space goes into
+ * bigger cards rather than into a different layout: the same board, read from
+ * further away.
+ */
+const useRoomy = (): boolean => {
+  const query = "(min-width: 680px) and (min-height: 700px)";
+  const [roomy, setRoomy] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(query).matches
+  );
+  useEffect(() => {
+    const media = window.matchMedia(query);
+    const update = () => setRoomy(media.matches);
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  return roomy;
+};
+
 /** Watches the event log for a cramp so the lane can shake once. */
 const useCrampFlash = (game: GameState): number | null => {
   const [seat, setSeat] = useState<number | null>(null);
@@ -110,6 +130,7 @@ export const GameScreen = ({
   const targeting = targets.length > 0;
   const crampSeat = useCrampFlash(game);
   const lastDrawn = useLastDrawn(game);
+  const roomy = useRoomy();
   const odds = drawOdds(game, game.actor);
 
   const rivals = game.players
@@ -120,7 +141,18 @@ export const GameScreen = ({
   // to a scrollable strip of narrow ones. Fewer rivals means bigger cards, so
   // the space freed up goes to something worth looking at.
   const stacked = rivals.length <= 3;
-  const rivalSize = !stacked ? "xs" : rivals.length <= 2 ? "md" : "sm";
+  const rivalSize = !stacked
+    ? roomy
+      ? "sm"
+      : "xs"
+    : rivals.length <= 2
+      ? roomy
+        ? "lg"
+        : "md"
+      : roomy
+        ? "md"
+        : "sm";
+  const mySize = roomy ? "lg" : "md";
   const interactive = !busy && !actor.isAI;
 
   // Keyboard: space accelerates, S catches breath, 1-8 pick a target.
@@ -184,6 +216,7 @@ export const GameScreen = ({
       <div
         className={cn(
           "no-scrollbar flex min-h-0 flex-1 flex-col px-3 pb-1",
+          roomy && "justify-center gap-2",
           stacked ? "overflow-y-auto" : "overflow-x-auto"
         )}
       >
@@ -208,9 +241,9 @@ export const GameScreen = ({
       <div className="flex shrink-0 items-center justify-center gap-4 px-3 py-1.5">
         <div className="flex items-center gap-2">
           {game.deck.length > 0 ? (
-            <Card code={0} faceUp={false} size="sm" />
+            <Card code={0} faceUp={false} size={roomy ? "md" : "sm"} />
           ) : (
-            <EmptyCard size="sm" />
+            <EmptyCard size={roomy ? "md" : "sm"} />
           )}
           <span className="text-[10px] leading-tight tabular-nums text-white/35">
             {game.deck.length}
@@ -224,11 +257,11 @@ export const GameScreen = ({
             <Card
               key={lastDrawn.id}
               code={lastDrawn.code}
-              size="sm"
+              size={roomy ? "md" : "sm"}
               dealDelay={0}
             />
           ) : (
-            <EmptyCard size="sm" />
+            <EmptyCard size={roomy ? "md" : "sm"} />
           )}
           {/* A number card says its own name; only action and modifier cards
               gain anything from a caption. */}
@@ -244,7 +277,7 @@ export const GameScreen = ({
       <div className="shrink-0 px-3">
         <Lane
           runner={actor}
-          size="md"
+          size={mySize}
           active
           isMe
           targetable={interactive && targets.includes(game.actor)}
