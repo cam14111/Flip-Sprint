@@ -90,6 +90,19 @@ describe("la crampe", () => {
     expect(g.turnSeat).toBe(1);
     expect(g.phase).toBe("decide");
   });
+
+  it("garde une trace du couloir perdu pour le récapitulatif", () => {
+    // Les cartes partent à la défausse immédiatement : sans cette trace,
+    // l'écran de fin de course ne pourrait pas distinguer une crampe d'un
+    // coureur qui n'a jamais rien pris.
+    let g = play(stackedGame([5, 6, TURBO, 7, 5]), hit(5), 5);
+    expect(g.players[0].lastLane).toEqual([5, TURBO, 5]);
+
+    g = reduce(g, { type: "stay" }); // B souffle -> la course est comptée
+    expect(g.players[0].status).toBe("cramped");
+    expect(g.players[0].lastLane).toEqual([5, TURBO, 5]);
+    expect(g.players[0].lastRoundScore).toBe(0);
+  });
 });
 
 describe("le sprint parfait", () => {

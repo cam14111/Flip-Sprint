@@ -265,8 +265,15 @@ const resolveCard = (
         });
       }
       // Crampe: the lane is worth nothing and every card in it leaves play.
+      // Snapshot it first — the end-of-race recap has to be able to show what
+      // was lost, and by scoring time the cards are long gone to the discard.
       s = toDiscard(s, [...runner.lane, card]);
-      s = patchRunner(s, seat, (r) => ({ ...r, lane: [], status: "cramped" }));
+      s = patchRunner(s, seat, (r) => ({
+        ...r,
+        lastLane: [...r.lane.map((c) => c.code), card.code],
+        lane: [],
+        status: "cramped",
+      }));
       return withEvent(s, { type: "cramp", seat, value: card.code });
     }
 
@@ -351,7 +358,8 @@ export const endRound = (state: GameState): GameState => {
       ...p,
       lane: [],
       secondWind: null,
-      lastLane: p.lane.map((c) => c.code),
+      // A cramped runner already snapshotted their lane when it collapsed.
+      lastLane: p.status === "cramped" ? p.lastLane : p.lane.map((c) => c.code),
       totalScore: p.totalScore + scores[seat],
       lastRoundScore: scores[seat],
       roundScores: [...p.roundScores, scores[seat]],

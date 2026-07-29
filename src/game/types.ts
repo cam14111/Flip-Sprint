@@ -129,12 +129,15 @@ export type Difficulty = "easy" | "normal" | "hard";
  * "roundOver" — the race is scored
  * "gameOver"  — the finish line was crossed
  */
-export type GamePhase =
-  | "draw"
-  | "decide"
-  | "targeting"
-  | "roundOver"
-  | "gameOver";
+export const ALL_PHASES = [
+  "draw",
+  "decide",
+  "targeting",
+  "roundOver",
+  "gameOver",
+] as const;
+
+export type GamePhase = (typeof ALL_PHASES)[number];
 
 /** An action card waiting for its target to be chosen. */
 export interface PendingAssign {

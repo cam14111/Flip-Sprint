@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "generate:icons": "node scripts/generate-icons.mjs",
     "e2e:online": "node scripts/e2e-online.mjs",
-    "e2e:online:fast": "node scripts/e2e-online.mjs --fast"
+    "e2e:online:fast": "node scripts/e2e-online.mjs --fast",
+    "smoke": "node scripts/smoke-local.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.2",
