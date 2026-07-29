@@ -120,22 +120,38 @@ verrouillé par les règles ci-dessus. La génération de la donne est isolée d
 `src/online/dealer.ts` : c'est le seul endroit à changer le jour où elle devrait
 venir d'une source de confiance (une Cloud Function, sur plan Blaze).
 
-### Configuration Firebase (une seule fois)
+### Configuration Firebase
 
-Le projet attendu est `flip-sprint-live` (modifiable par variables d'env).
+Le projet est `flip-sprint-live`, et sa configuration web est **déjà renseignée**
+dans `src/online/firebase.ts`. Ces valeurs — clé d'API et identifiant
+d'application — sont **publiques par nature** : ce sont des identifiants, pas
+des secrets, et toute la sécurité vient des règles de la base. Elles peuvent
+donc être committées sans risque. Elles restent surchargeables au build via
+`VITE_FIREBASE_API_KEY` et `VITE_FIREBASE_APP_ID`.
 
-1. Console Firebase → **créer le projet** (plan Spark, gratuit).
-2. **Realtime Database → Créer** — région `europe-west1`, **mode verrouillé**.
-3. **Authentication → Sign-in method → Anonyme : activer**.
-4. **Paramètres du projet → Vos applications → Ajouter une app Web**, puis
-   renseigner `apiKey` et `appId` dans `src/online/firebase.ts`, ou au build via
-   `VITE_FIREBASE_API_KEY` et `VITE_FIREBASE_APP_ID`. Ces valeurs sont
-   **publiques par nature** (la sécurité vient des règles) et peuvent être
-   committées.
-5. **Déployer les règles avant toute ouverture** :
-   `npx firebase deploy --only database`.
-6. **Authentication → Settings → Domaines autorisés** : ajouter le domaine
-   GitHub Pages.
+**Le point critique : les règles doivent être déployées.** Une base laissée en
+mode verrouillé est sûre mais totalement inerte — toute lecture et toute
+écriture sont refusées, donc le mode en ligne ne se connecte jamais.
+
+```sh
+npx firebase login
+npx firebase deploy --only database
+```
+
+ou, sans outillage : coller le contenu de `database.rules.json` dans
+**Console → Realtime Database → Règles → Publier**.
+
+Pour savoir où en est le projet réel à tout moment :
+
+```sh
+npm run check:live
+```
+
+Il vérifie la connexion anonyme et dit si les règles du dépôt sont bien en
+place ou si la base tourne encore en mode verrouillé.
+
+Enfin, une fois le site publié : **Authentication → Settings → Domaines
+autorisés** → ajouter le domaine GitHub Pages.
 
 Tant que la configuration n'est pas renseignée, l'application fonctionne
 normalement et le mode en ligne affiche « non configuré ».

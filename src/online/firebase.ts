@@ -23,13 +23,15 @@ const env = import.meta.env;
 const PLACEHOLDER = "A_RENSEIGNER";
 
 export const firebaseConfig = {
-  apiKey: env.VITE_FIREBASE_API_KEY ?? PLACEHOLDER,
+  apiKey:
+    env.VITE_FIREBASE_API_KEY ?? "AIzaSyADu1UwuOWBrjqwhFeirZ6aZnttcycIa9U",
   authDomain: env.VITE_FIREBASE_AUTH_DOMAIN ?? "flip-sprint-live.firebaseapp.com",
   databaseURL:
     env.VITE_FIREBASE_DATABASE_URL ??
     "https://flip-sprint-live-default-rtdb.europe-west1.firebasedatabase.app",
   projectId: env.VITE_FIREBASE_PROJECT_ID ?? "flip-sprint-live",
-  appId: env.VITE_FIREBASE_APP_ID ?? PLACEHOLDER,
+  appId:
+    env.VITE_FIREBASE_APP_ID ?? "1:799467899578:web:ec326577ef0089fb7bd083",
 };
 
 const emulatorsEnabled = (): boolean => env.VITE_FIREBASE_EMULATORS === "1";
