@@ -72,9 +72,11 @@ const AppInner = () => {
   // In solo the device belongs to seat 0; in local play every seat is someone
   // in the room, so no single seat owns the statistics.
   const humanSeat = settings.mode === "solo" ? 0 : null;
-  const { game, stats, dispatch, newGame, nextRound } = useGame(
+  const { game, stats, aiThinking, dispatch, newGame, nextRound } = useGame(
     restored,
-    humanSeat
+    humanSeat,
+    // Freeze the AI while the board is off screen or behind a panel.
+    screen !== "game" || panel !== null
   );
 
   // The board uses a fixed dark surface — pin the token set so every Radix
@@ -141,6 +143,7 @@ const AppInner = () => {
             dispatch={dispatch}
             onOpenMenu={() => setPanel("menu")}
             showRisk={settings.showRisk}
+            busy={aiThinking}
           />
           <Overlays
             game={game}

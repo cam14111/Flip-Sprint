@@ -4,7 +4,14 @@
 // effect lives here — sounds, vibrations, saving the game, recording stats.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createGame, CreateGameOptions, dealNextRound, reduce } from "@/game/engine";
+import { decideAction, thinkingDelay } from "@/game/ai";
+import {
+  createGame,
+  CreateGameOptions,
+  dealNextRound,
+  legalTargets,
+  reduce,
+} from "@/game/engine";
 import { clearGame, saveGame } from "@/game/persistence";
 import { randomSeed } from "@/game/deck";
 import {
@@ -65,6 +72,8 @@ const playEvents = (events: GameEvent[], humanSeat: number | null): void => {
 export interface UseGame {
   game: GameState;
   stats: Stats;
+  /** An AI runner is about to move — the board locks its buttons. */
+  aiThinking: boolean;
   dispatch: (action: GameAction) => void;
   newGame: (options: CreateGameOptions) => GameState;
   nextRound: () => void;
@@ -74,10 +83,12 @@ export interface UseGame {
 /**
  * @param humanSeat Which seat the device belongs to (solo). `null` in local
  *        play, where every seat is a person in the room and stats stay neutral.
+ * @param paused Freezes the AI loop while the board is off screen.
  */
 export const useGame = (
   initial: GameState | null,
-  humanSeat: number | null
+  humanSeat: number | null,
+  paused = false
 ): UseGame => {
   const [game, setGame] = useState<GameState>(
     () => initial ?? createGame({ seed: randomSeed() })
@@ -122,6 +133,36 @@ export const useGame = (
     saveGame(game);
   }, [game]);
 
+  // --- AI runners --------------------------------------------------------
+  // The move is decided from the state this effect saw, then applied on a
+  // timer so it is watchable. The identity check inside setGame throws the
+  // decision away if the board moved on in the meantime — which is what makes
+  // it safe under StrictMode's double-invoked effects.
+  const actor = game.players[game.actor];
+  const aiTurn =
+    !paused &&
+    !!actor?.isAI &&
+    (game.phase === "draw" ||
+      game.phase === "decide" ||
+      game.phase === "targeting");
+
+  useEffect(() => {
+    if (!aiTurn) return;
+    const action = decideAction(game, legalTargets(game));
+    if (!action) return;
+
+    const timer = setTimeout(() => {
+      setGame((current) => {
+        if (current !== game) return current;
+        const next = reduce(current, action);
+        if (next !== current) playEvents(next.events, humanSeat);
+        return next;
+      });
+    }, thinkingDelay(game));
+
+    return () => clearTimeout(timer);
+  }, [aiTurn, game, humanSeat]);
+
   // Record statistics once per race and once per game, for the human seat.
   useEffect(() => {
     if (humanSeat === null) return;
@@ -158,7 +199,7 @@ export const useGame = (
     }
   }, [game, humanSeat]);
 
-  return { game, stats, dispatch, newGame, nextRound, abandon };
+  return { game, stats, aiThinking: aiTurn, dispatch, newGame, nextRound, abandon };
 };
 
 /** Exposed for the online bridge, which owns its own state pipeline. */
