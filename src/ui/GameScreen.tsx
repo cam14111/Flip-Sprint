@@ -144,8 +144,11 @@ export const GameScreen = ({
   }, [dispatch, game, interactive, targeting, targets]);
 
   return (
+    // The board is designed for a thumb. On a wide screen it is centred and
+    // capped rather than stretched: a lane spanning 1400px would put the cards
+    // and the score at opposite ends of the desk.
     <div
-      className="app-bg flex h-[100dvh] flex-col text-white"
+      className="app-bg mx-auto flex h-[100dvh] w-full max-w-2xl flex-col text-white"
       style={{
         paddingTop: "env(safe-area-inset-top)",
         paddingBottom: "env(safe-area-inset-bottom)",
