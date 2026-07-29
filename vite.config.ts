@@ -62,7 +62,5 @@ export default defineConfig(({ mode }) => ({
   test: {
     environment: "node",
     include: ["src/**/*.test.ts"],
-    // The engine lands in the next step; keep the scaffold's CI green until then.
-    passWithNoTests: true,
   },
 }));
