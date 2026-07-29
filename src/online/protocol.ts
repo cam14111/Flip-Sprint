@@ -50,13 +50,16 @@ export const randomGameCode = (): string => {
   return out;
 };
 
-/** Uppercases and strips separators, so a pasted or typed code is forgiving. */
+/**
+ * Uppercases and strips separators, so a pasted or typed code is forgiving.
+ *
+ * Note what this does *not* do: map O to 0 or I to 1. That reflex is wrong
+ * here — neither 0 nor 1 is in the alphabet, so "correcting" a character would
+ * turn a valid code into an invalid one. The alphabet avoids the confusable
+ * pairs in the first place, which is the whole point of choosing it.
+ */
 export const normalizeGameCode = (raw: string): string =>
-  raw
-    .toUpperCase()
-    .replace(/[^A-Z0-9]/g, "")
-    .replace(/O/g, "0")
-    .replace(/[IL]/g, "1");
+  raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
 
 export const isValidGameCode = (code: string): boolean =>
   code.length === CODE_LENGTH && [...code].every((c) => CODE_ALPHABET.includes(c));

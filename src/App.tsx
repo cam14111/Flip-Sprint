@@ -13,10 +13,12 @@ import {
   Settings,
 } from "./game/settings";
 import { loadStats, resetStats, Stats } from "./game/stats";
+import { loadOnlineSession } from "./online/session";
 import { useGame } from "./hooks/useGame";
 import { setHapticsEnabled } from "./lib/haptics";
 import { primeAudio, setSoundEnabled } from "./lib/sound";
 import { GameScreen } from "./ui/GameScreen";
+import { OnlineIntent, OnlineMode } from "./ui/OnlineMode";
 import { Overlays } from "./ui/Overlays";
 import { Home } from "./ui/screens/Home";
 import { Panel } from "./ui/screens/Panel";
@@ -24,7 +26,30 @@ import { Rules } from "./ui/screens/Rules";
 import { SettingsScreen } from "./ui/screens/SettingsScreen";
 import { StatsScreen } from "./ui/screens/StatsScreen";
 
-type Screen = "home" | "game";
+type Screen = "home" | "game" | "online";
+
+/**
+ * ?join=CODE deep link from a shared invite, read once and stripped from the
+ * address bar so a refresh does not try to join all over again.
+ *
+ * Deliberately at module scope. Reading it is destructive, and React runs
+ * both useMemo bodies and lazy state initialisers twice under StrictMode —
+ * the second call would find nothing and quietly drop the invitation. Module
+ * initialisation happens exactly once, which is the guarantee this needs.
+ */
+const INITIAL_JOIN_CODE: string | null = (() => {
+  try {
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get("join");
+    if (!code) return null;
+    url.searchParams.delete("join");
+    window.history.replaceState(null, "", url.toString());
+    return code;
+  } catch {
+    return null;
+  }
+})();
+
 type PanelKind = "rules" | "stats" | "settings" | "menu" | null;
 
 /** Turns the home-screen settings into engine options. */
@@ -63,7 +88,20 @@ const gameOptions = (settings: Settings) => {
 const AppInner = () => {
   const [settings, setSettings] = useState<Settings>(() => loadSettings());
   const restored = useMemo(() => loadGame(), []);
-  const [screen, setScreen] = useState<Screen>("home");
+
+  // An invite link, or a race this device is already part of, goes straight
+  // back to it — reopening the app mid-race must land on the board. Resolved
+  // once, since reading the link consumes it.
+  const opening = useMemo((): { intent: OnlineIntent; screen: Screen } => {
+    if (INITIAL_JOIN_CODE) {
+      return { intent: { type: "join", code: INITIAL_JOIN_CODE }, screen: "online" };
+    }
+    if (loadOnlineSession()) return { intent: { type: "resume" }, screen: "online" };
+    return { intent: { type: "menu" }, screen: "home" };
+  }, []);
+
+  const [onlineIntent, setOnlineIntent] = useState<OnlineIntent>(opening.intent);
+  const [screen, setScreen] = useState<Screen>(opening.screen);
   const [panel, setPanel] = useState<PanelKind>(null);
   const [panelOrigin, setPanelOrigin] = useState<"home" | "menu">("home");
   const [hasSaved, setHasSaved] = useState(restored !== null);
@@ -99,6 +137,12 @@ const AppInner = () => {
 
   const startGame = useCallback(() => {
     primeAudio();
+    if (settings.mode === "online") {
+      setOnlineIntent({ type: "menu" });
+      setPanel(null);
+      setScreen("online");
+      return;
+    }
     newGame(gameOptions(settings));
     setPanel(null);
     setHasSaved(true);
@@ -121,6 +165,17 @@ const AppInner = () => {
   const closeSubPanel = useCallback(() => {
     setPanel(panelOrigin === "menu" ? "menu" : null);
   }, [panelOrigin]);
+
+  if (screen === "online") {
+    return (
+      <OnlineMode
+        settings={settings}
+        onChange={patchSettings}
+        intent={onlineIntent}
+        onExit={goHome}
+      />
+    );
+  }
 
   return (
     <>

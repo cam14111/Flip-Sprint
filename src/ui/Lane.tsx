@@ -31,6 +31,8 @@ export interface LaneProps {
   onTarget?: () => void;
   /** Plays the cramp shake once. */
   cramping?: boolean;
+  /** Online: this runner's device is not currently connected. */
+  offline?: boolean;
   compact?: boolean;
   className?: string;
 }
@@ -43,6 +45,7 @@ export const Lane = ({
   targetable,
   onTarget,
   cramping,
+  offline,
   compact,
   className,
 }: LaneProps) => {
@@ -90,6 +93,14 @@ export const Lane = ({
         >
           {runner.name}
         </span>
+
+        {offline && (
+          <span
+            title="Déconnecté"
+            aria-label="Déconnecté"
+            className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-400"
+          />
+        )}
 
         {/* A Second souffle is deliberately shown as a badge and never as a
             card in the lane: it scores nothing and counts toward nothing, so

@@ -69,13 +69,28 @@ const useLastDrawn = (game: GameState): CardType | null => {
   return last.current;
 };
 
+/**
+ * The little the board needs to know about who is actually connected. Kept as
+ * a local shape rather than importing the online client's type, so the online
+ * module never gets pulled into the offline bundle.
+ */
+export interface SeatPresence {
+  seat: number;
+  online: boolean;
+  out: boolean;
+}
+
 export interface GameScreenProps {
   game: GameState;
   dispatch: (action: GameAction) => void;
   onOpenMenu: () => void;
   showRisk: boolean;
-  /** Blocks input while an AI runner is thinking. */
+  /** Blocks input while an AI runner is thinking, or while it is not my turn. */
   busy?: boolean;
+  /** Online only: who is connected. */
+  presence?: readonly SeatPresence[];
+  /** Online only: the runner everyone is waiting on, when it is not me. */
+  waitingFor?: string | null;
 }
 
 export const GameScreen = ({
@@ -84,6 +99,8 @@ export const GameScreen = ({
   onOpenMenu,
   showRisk,
   busy,
+  presence,
+  waitingFor,
 }: GameScreenProps) => {
   const actor = game.players[game.actor];
   const targets = useMemo(
@@ -177,6 +194,7 @@ export const GameScreen = ({
               targetable={interactive && targets.includes(seat)}
               onTarget={() => dispatch({ type: "assign", target: seat })}
               cramping={crampSeat === seat}
+              offline={presence?.[seat]?.online === false}
               className={cn(!stacked && "w-40 shrink-0")}
             />
           ))}
@@ -252,7 +270,14 @@ export const GameScreen = ({
           />
         )}
 
-        {targeting ? (
+        {waitingFor ? (
+          <p
+            data-testid="waiting-for"
+            className="py-4 text-center text-sm text-white/50"
+          >
+            En attente de <span className="text-white/80">{waitingFor}</span>…
+          </p>
+        ) : targeting ? (
           <p className="py-2 text-center text-xs text-white/45">
             Touche un couloir pour choisir
           </p>

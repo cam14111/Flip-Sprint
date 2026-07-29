@@ -98,6 +98,8 @@ export interface OverlaysProps {
   onNextRound: () => void;
   onNewGame: () => void;
   onHome: () => void;
+  /** Online: I am ready, the next race waits on somebody else. */
+  waitingForOthers?: boolean;
 }
 
 export const Overlays = ({
@@ -106,6 +108,7 @@ export const Overlays = ({
   onNextRound,
   onNewGame,
   onHome,
+  waitingForOthers,
 }: OverlaysProps) => {
   if (game.phase !== "roundOver" && game.phase !== "gameOver") return null;
 
@@ -169,9 +172,10 @@ export const Overlays = ({
               variant="primary"
               size="lg"
               className="w-full"
+              disabled={waitingForOthers}
               onClick={onNextRound}
             >
-              {UI.nextRace}
+              {waitingForOthers ? "En attente des autres…" : UI.nextRace}
             </Button>
           )}
         </div>

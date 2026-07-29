@@ -72,19 +72,32 @@ const init = (): { auth: Auth; db: Database } => {
   return { auth: auth!, db: db! };
 };
 
+/** In-flight sign-in, shared by every concurrent caller. */
+let pendingSignIn: Promise<{ uid: string; db: Database }> | null = null;
+
 /**
- * Signs in anonymously. Idempotent: Firebase keeps the anonymous user in
- * IndexedDB, so the same uid survives reloads and app restarts — which is
- * exactly what makes seamless reconnection possible without any account.
+ * Signs in anonymously. Firebase keeps the anonymous user in IndexedDB, so the
+ * same uid survives reloads and app restarts — which is exactly what makes
+ * seamless reconnection possible without any account.
+ *
+ * The shared promise is load-bearing, not an optimisation. Two concurrent
+ * callers would each see `currentUser` still empty and each start their own
+ * anonymous sign-in, ending up with two different uids; whichever lost the
+ * race would no longer recognise the seat it had just claimed. React's
+ * StrictMode double-invokes effects and reproduced exactly that — a guest
+ * joined, then immediately failed with "this race has already started".
  */
-export const ensureSignedIn = async (): Promise<{
-  uid: string;
-  db: Database;
-}> => {
+export const ensureSignedIn = (): Promise<{ uid: string; db: Database }> => {
   const { auth, db } = init();
-  if (auth.currentUser) return { uid: auth.currentUser.uid, db };
-  const credential = await signInAnonymously(auth);
-  return { uid: credential.user.uid, db };
+  if (auth.currentUser) return Promise.resolve({ uid: auth.currentUser.uid, db });
+  if (!pendingSignIn) {
+    pendingSignIn = signInAnonymously(auth)
+      .then((credential) => ({ uid: credential.user.uid, db }))
+      .finally(() => {
+        pendingSignIn = null;
+      });
+  }
+  return pendingSignIn;
 };
 
 export const getDb = (): Database => init().db;
