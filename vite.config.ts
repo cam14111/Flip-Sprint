@@ -30,8 +30,11 @@ export default defineConfig(({ mode }) => ({
         description:
           "Jeu de cartes : pousse ta chance jusqu'à la ligne d'arrivée. Solo, local ou en ligne — fonctionne hors-ligne.",
         lang: "fr",
-        theme_color: "#12082e",
-        background_color: "#12082e",
+        // Same colour as html's background and the theme-color meta tag: the
+        // top of the track gradient, so nothing the OS paints around the app
+        // reads as a black band. See the comment in src/index.css.
+        theme_color: "#251056",
+        background_color: "#251056",
         // Fullscreen hides the system status/navigation bars on an installed
         // PWA (Android) to maximise the play surface; standalone is the
         // graceful fallback where fullscreen isn't honoured.

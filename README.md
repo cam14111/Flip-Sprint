@@ -51,6 +51,10 @@ numéros rapportent le plus et sont ceux qui cramponnent le plus souvent.
   quand tout le monde est là (ou démarrage anticipé par l'hôte), présence de
   chacun, reconnexion transparente après un rafraîchissement ou une coupure
   réseau, exclusion d'un joueur absent validée côté base.
+- **Annonce des cartes subies** : un coup de sifflet ou une rafale arrive
+  pendant le tour de quelqu'un d'autre et change ce que tu dois faire ensuite.
+  Quand l'une des deux vise un joueur humain, elle est annoncée en plein écran
+  — la carte, qui l'envoie, ce qu'elle fait. Une touche pour reprendre.
 - **Sons synthétisés** (Web Audio, aucun fichier audio) et **retour haptique**,
   désactivables.
 - **Statistiques** locales et **écran de règles** illustré avec les vraies cartes.
@@ -62,9 +66,9 @@ src/game/      moteur pur : types, deck, engine, scoring, odds, ai, settings,
                stats, persistence, copy (tous les textes)
 src/online/    protocol · dealer · replay · client (RTDB) · firebase · session
 src/hooks/     useGame (solo & local, pilote l'IA) · useOnlineGame
-src/ui/        Card, Lane, RiskGauge, GameScreen, Overlays, écrans
+src/ui/        Card, Lane, RiskGauge, GameScreen, Incoming, Overlays, écrans
 scripts/       generate-icons · build-rules · emulators · test-rules ·
-               e2e-online · smoke-local · screenshot
+               e2e-online · smoke-local · check-notch · screenshot
 database.rules.json   règles de sécurité RTDB (généré, voir plus bas)
 ```
 
@@ -72,6 +76,22 @@ Les **cartes sont dessinées en CSS** (`src/ui/Card.tsx`, couleurs dans
 `src/ui/theme.ts`) : aucune image n'est chargée, le rendu est net à toutes les
 tailles et le poids hors-ligne est quasi nul. Les numéros sont colorés par le
 **risque** — bleu calme (0-4), ambre (5-8), magenta incandescent (9-12).
+
+### Le piège de l'encoche
+
+Sur une PWA installée, l'écran physique est plus haut que la page : la bande
+derrière l'encoche et le débord de défilement sont peints par l'OS avec **une
+couleur unie** prise à la racine du document. Le CSS ne peut pas dessiner là.
+
+Cette couleur doit donc correspondre à ce que l'application peint **en haut**
+de l'écran — le sommet du dégradé, bien plus clair que le reste du plateau —
+et non à sa teinte moyenne. Une couleur choisie sur le bas du dégradé donne
+une **bande noire** sous l'encoche, invisible au navigateur et flagrante sur un
+téléphone. Trois endroits doivent rester alignés : `html { background-color }`,
+`<meta name="theme-color">` et les couleurs du manifeste.
+
+`npm run check:notch` mesure les pixels réellement peints et refuse un écart
+visible, plutôt que de faire confiance à la feuille de style.
 
 ## Mode en ligne
 
@@ -187,6 +207,7 @@ npm test               # moteur, IA, rejeu — 94 tests
 npm run lint
 npm run build          # typecheck + build de production
 npm run smoke          # joue une partie locale entière dans un vrai navigateur
+npm run check:notch    # la zone derrière l'encoche se raccorde-t-elle au plateau ?
 npm run test:rules     # 34 sondes de sécurité contre l'émulateur
 npm run e2e:online     # deux navigateurs, une vraie course en ligne (14 vérifs)
 ```

@@ -42,11 +42,17 @@
   #root {
     height: 100%;
   }
-  /* Solid indigo base (matches the manifest background/theme colour) so no
-     area is ever pure black — including any OS-drawn letterbox behind a camera
-     cutout or status bar that CSS on <body> can't reach. */
+  /* The colour the OS paints wherever CSS cannot reach: the letterbox behind a
+     camera cutout or status bar, and the overscroll gutter.
+
+     It has to match what the app paints AT THE TOP of the screen, not the
+     average of the track — the eye reads the seam, not the absolute value.
+     The gradient below starts at #251056 up there, which is much lighter than
+     the deep indigo of the rest; a base picked from the bottom of the track
+     showed as a black band under the notch. Kept in step with the manifest's
+     theme/background colour and the theme-color meta tag. */
   html {
-    background-color: #12082e;
+    background-color: #251056;
   }
   body {
     @apply text-foreground;

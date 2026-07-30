@@ -78,6 +78,17 @@ export const UI = {
   chooseTargetSecondWind: "À qui donnes-tu ce second souffle ?",
   chooseTargetOther: (name: string) => `${name} choisit une cible`,
   deferredHint: "Mise de côté pendant la rafale",
+
+  // --- A card played on a human runner --------------------------------------
+  // A sifflet or a rafale changes what you have to do next, and it arrives on
+  // somebody else's turn — easy to miss entirely on a small screen. Hence an
+  // announcement, phrased to the target when this device has one.
+  incomingOnMe: (by: string) => `${by} te l'envoie`,
+  incomingOnOther: (by: string, target: string) =>
+    `${by} l'envoie sur ${target}`,
+  whistleOnMe: "Tu encaisses tes points et tu sors de la course.",
+  burstOnMe: "Tu dois prendre trois cartes d'affilée.",
+  incomingDismiss: "Touche pour continuer",
   targetSelf: "Toi",
 
   // --- Race events --------------------------------------------------------

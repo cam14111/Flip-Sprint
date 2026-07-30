@@ -15,9 +15,11 @@ import {
 } from "@/game/types";
 import { cn } from "@/lib/utils";
 import { Card, EmptyCard } from "./Card";
+import { Incoming } from "./Incoming";
 import { Lane } from "./Lane";
 import { RiskGauge } from "./RiskGauge";
 import { CRAMP_ANIMATION_MS } from "./theme";
+import { transitionKey } from "./transition";
 
 /**
  * The line above the buttons that tells the player what is being asked.
@@ -69,16 +71,25 @@ const useRoomy = (): boolean => {
   return roomy;
 };
 
-/** Watches the event log for a cramp so the lane can shake once. */
+/**
+ * Watches the event log for a cramp so the lane can shake once.
+ *
+ * Keyed off the transition rather than the events array — online, the same
+ * array arrives again with every snapshot, and the shake would restart on each
+ * one instead of playing once. See `transition.ts`.
+ */
 const useCrampFlash = (game: GameState): number | null => {
   const [seat, setSeat] = useState<number | null>(null);
+  const latest = useRef(game);
+  latest.current = game;
+  const transition = transitionKey(game);
   useEffect(() => {
-    const cramp = game.events.find((e) => e.type === "cramp");
+    const cramp = latest.current.events.find((e) => e.type === "cramp");
     if (!cramp) return;
     setSeat(cramp.seat);
     const timer = setTimeout(() => setSeat(null), CRAMP_ANIMATION_MS);
     return () => clearTimeout(timer);
-  }, [game.events]);
+  }, [transition]);
   return seat;
 };
 
@@ -373,6 +384,11 @@ export const GameScreen = ({
           </div>
         )}
       </div>
+
+      {/* Announces a sifflet or a rafale landing on a human runner. Lives here
+          rather than in Overlays because this board is the one screen every
+          mode renders. */}
+      <Incoming game={game} mySeat={mySeat} />
     </div>
   );
 };

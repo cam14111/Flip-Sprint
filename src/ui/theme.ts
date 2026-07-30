@@ -110,6 +110,13 @@ export const CRAMP_ANIMATION_MS = 620;
 /** Delay between the three cards of a Rafale, so the burst is readable. */
 export const BURST_STAGGER_MS = 260;
 
+/**
+ * How long the announcement of a card played on you stays up before clearing
+ * itself. Long enough to read two short lines, short enough that a player who
+ * already understood is not kept waiting — and a tap dismisses it anyway.
+ */
+export const INCOMING_ALERT_MS = 2400;
+
 /** Unscaled lane footprints per card size, for the ScaledBox wrappers. */
 export const CARD_DIMS = {
   xs: { w: 30, h: 42 },
