@@ -27,11 +27,16 @@ interface Incoming {
  * Watches the event log for a Coup de sifflet or a Rafale landing on a human
  * runner, and holds it just long enough to be read.
  *
- * Keyed off the transition, never off the events array itself — see
- * `transition.ts`: online, an identical array arrives with every snapshot, and
- * an announcement re-armed that often would never dismiss. Everything else is
- * read through a ref rather than added to the dependencies, for the same
- * reason: an unrelated re-render must not restart the timer.
+ * Three effects, deliberately separate, because the two ways this can go wrong
+ * pull in opposite directions: watching for the event, counting down to the
+ * dismissal, and clearing up at the end of a race. Fold the countdown into the
+ * watcher and every later transition cancels it; key the watcher off the
+ * events array instead of the transition and online re-derivations re-arm it
+ * forever. Both bugs look the same on screen — an announcement that will not
+ * go away — and both have been shipped here once.
+ *
+ * The game state is read through a ref rather than through the dependencies,
+ * so an unrelated re-render cannot restart anything.
  */
 const useIncoming = (game: GameState, mySeat?: number | null) => {
   const [incoming, setIncoming] = useState<Incoming | null>(null);
@@ -62,9 +67,26 @@ const useIncoming = (game: GameState, mySeat?: number | null) => {
       target: g.players[hit.seat]?.name ?? "",
       onMe: owned,
     });
+  }, [transition]);
+
+  // The countdown belongs to the announcement, never to the event watcher.
+  // Armed inside the effect above, the very next transition — a rival drawing
+  // a card, the race ending — ran that effect's cleanup, cancelled the timer
+  // and then returned early with no new one: the announcement stayed for good,
+  // invisible under the recap and back on screen at the next race.
+  useEffect(() => {
+    if (!incoming) return;
     const timer = setTimeout(() => setIncoming(null), INCOMING_ALERT_MS);
     return () => clearTimeout(timer);
-  }, [transition]);
+  }, [incoming]);
+
+  // A race that ends takes its announcements with it. The recap tells that
+  // story now, and nothing from the last race may reappear in the next one.
+  useEffect(() => {
+    if (game.phase === "roundOver" || game.phase === "gameOver") {
+      setIncoming(null);
+    }
+  }, [game.phase]);
 
   return [incoming, useCallback(() => setIncoming(null), [])] as const;
 };

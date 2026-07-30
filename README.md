@@ -68,7 +68,8 @@ src/online/    protocol · dealer · replay · client (RTDB) · firebase · sess
 src/hooks/     useGame (solo & local, pilote l'IA) · useOnlineGame
 src/ui/        Card, Lane, RiskGauge, GameScreen, Incoming, Overlays, écrans
 scripts/       generate-icons · build-rules · emulators · test-rules ·
-               e2e-online · smoke-local · check-notch · screenshot
+               e2e-online · smoke-local · check-notch · check-alerts ·
+               screenshot
 database.rules.json   règles de sécurité RTDB (généré, voir plus bas)
 ```
 
@@ -208,6 +209,7 @@ npm run lint
 npm run build          # typecheck + build de production
 npm run smoke          # joue une partie locale entière dans un vrai navigateur
 npm run check:notch    # la zone derrière l'encoche se raccorde-t-elle au plateau ?
+npm run check:alerts   # l'annonce d'une carte subie se referme-t-elle seule ?
 npm run test:rules     # 34 sondes de sécurité contre l'émulateur
 npm run e2e:online     # deux navigateurs, une vraie course en ligne (14 vérifs)
 ```

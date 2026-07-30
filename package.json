@@ -15,6 +15,7 @@
     "e2e:online:fast": "node scripts/e2e-online.mjs --fast",
     "smoke": "node scripts/smoke-local.mjs",
     "check:notch": "node scripts/check-notch.mjs",
+    "check:alerts": "node scripts/check-alerts.mjs",
     "build:rules": "node scripts/build-rules.mjs",
     "test:rules": "node scripts/test-rules.mjs",
     "emulators": "node scripts/emulators.mjs",
