@@ -152,11 +152,16 @@ ou, sans outillage : coller le contenu de `database.rules.json` dans
 Pour savoir où en est le projet réel à tout moment :
 
 ```sh
-npm run check:live
+npm run check:live         # connexion anonyme, et règles déployées ou non
+npm run check:rules-live   # les règles déployées sont-elles bien CELLES-CI ?
 ```
 
-Il vérifie la connexion anonyme et dit si les règles du dépôt sont bien en
-place ou si la base tourne encore en mode verrouillé.
+Le premier dit si la base répond et si elle est sortie du mode verrouillé. Le
+second va plus loin : il crée une partie de test sous un code aléatoire, vérifie
+les deux comportements qui distinguent les règles corrigées de celles qu'elles
+remplacent — impossible de réécrire un paquet en cours, possible d'effacer une
+partie finie — puis efface sa partie. Utile après chaque publication, car
+« des » règles déployées ne veut pas dire « les bonnes ».
 
 Enfin, une fois le site publié : **Authentication → Settings → Domaines
 autorisés** → ajouter le domaine GitHub Pages.

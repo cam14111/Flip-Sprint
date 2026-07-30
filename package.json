@@ -17,7 +17,8 @@
     "build:rules": "node scripts/build-rules.mjs",
     "test:rules": "node scripts/test-rules.mjs",
     "emulators": "node scripts/emulators.mjs",
-    "check:live": "node scripts/check-live.mjs"
+    "check:live": "node scripts/check-live.mjs",
+    "check:rules-live": "node scripts/check-rules-live.mjs"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.2",
