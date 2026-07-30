@@ -19,17 +19,25 @@ import { Lane } from "./Lane";
 import { RiskGauge } from "./RiskGauge";
 import { CRAMP_ANIMATION_MS } from "./theme";
 
-/** The line above the buttons that tells the player what is being asked. */
-const prompt = (game: GameState): string => {
+/**
+ * The line above the buttons that tells the player what is being asked.
+ *
+ * `myMove` decides the grammatical person: the second person is only ever
+ * addressed to the runner whose lane is pinned at the bottom, and that lane no
+ * longer moves with the turn.
+ */
+const prompt = (game: GameState, myMove: boolean): string => {
   const actor = game.players[game.actor];
   switch (game.phase) {
     case "draw":
-      return game.burstLeft > 0
-        ? `Rafale sur ${actor.name} — ${game.burstLeft} carte${game.burstLeft > 1 ? "s" : ""} à prendre`
-        : UI.openingDraw;
+      if (game.burstLeft > 0) {
+        return `Rafale sur ${actor.name} — ${game.burstLeft} carte${game.burstLeft > 1 ? "s" : ""} à prendre`;
+      }
+      return myMove ? UI.openingDraw : UI.openingDrawOther(actor.name);
     case "decide":
       return `${actor.name}, accélérer ou souffler ?`;
     case "targeting": {
+      if (!myMove) return UI.chooseTargetOther(actor.name);
       const code = game.pendingAssign?.card.code;
       if (code === WHISTLE) return UI.chooseTargetWhistle;
       if (code === BURST) return UI.chooseTargetBurst;
@@ -107,6 +115,17 @@ export interface GameScreenProps {
   showRisk: boolean;
   /** Blocks input while an AI runner is thinking, or while it is not my turn. */
   busy?: boolean;
+  /**
+   * The seat this device belongs to — solo and online. Its lane is anchored at
+   * the bottom of the screen and stays there whoever is playing: watching your
+   * own cards jump into the rivals' strip the moment somebody else acts is
+   * disorienting.
+   *
+   * Left undefined for local play, where every seat is a different person in
+   * the room and there is no "mine": there, the runner about to act is the one
+   * who should have their lane under their thumb.
+   */
+  mySeat?: number | null;
   /** Online only: who is connected. */
   presence?: readonly SeatPresence[];
   /** Online only: the runner everyone is waiting on, when it is not me. */
@@ -119,10 +138,10 @@ export const GameScreen = ({
   onOpenMenu,
   showRisk,
   busy,
+  mySeat,
   presence,
   waitingFor,
 }: GameScreenProps) => {
-  const actor = game.players[game.actor];
   const targets = useMemo(
     () => (game.phase === "targeting" ? legalTargets(game) : []),
     [game]
@@ -131,11 +150,20 @@ export const GameScreen = ({
   const crampSeat = useCrampFlash(game);
   const lastDrawn = useLastDrawn(game);
   const roomy = useRoomy();
+
+  // The lane pinned to the bottom, and whether it is the one being played.
+  const bottomSeat =
+    mySeat !== null && mySeat !== undefined && game.players[mySeat]
+      ? mySeat
+      : game.actor;
+  const bottomRunner = game.players[bottomSeat];
+  const myMove = bottomSeat === game.actor;
+  const actor = game.players[game.actor];
   const odds = drawOdds(game, game.actor);
 
   const rivals = game.players
     .map((runner, seat) => ({ runner, seat }))
-    .filter(({ seat }) => seat !== game.actor);
+    .filter(({ seat }) => seat !== bottomSeat);
 
   // Up to three rivals fit as full-width stacked lanes; beyond that they move
   // to a scrollable strip of narrow ones. Fewer rivals means bigger cards, so
@@ -226,6 +254,9 @@ export const GameScreen = ({
               key={runner.id}
               runner={runner}
               size={rivalSize}
+              // Now that my own lane is pinned below, this highlight is what
+              // says whose turn it is up here.
+              active={seat === game.actor}
               compact={!stacked}
               targetable={interactive && targets.includes(seat)}
               onTarget={() => dispatch({ type: "assign", target: seat })}
@@ -273,16 +304,17 @@ export const GameScreen = ({
         </div>
       </div>
 
-      {/* ---- The runner who must act ------------------------------------ */}
+      {/* ---- My lane, always here --------------------------------------- */}
       <div className="shrink-0 px-3">
         <Lane
-          runner={actor}
+          runner={bottomRunner}
           size={mySize}
-          active
+          active={myMove}
           isMe
-          targetable={interactive && targets.includes(game.actor)}
-          onTarget={() => dispatch({ type: "assign", target: game.actor })}
-          cramping={crampSeat === game.actor}
+          targetable={interactive && targets.includes(bottomSeat)}
+          onTarget={() => dispatch({ type: "assign", target: bottomSeat })}
+          cramping={crampSeat === bottomSeat}
+          offline={presence?.[bottomSeat]?.online === false}
         />
       </div>
 
@@ -292,7 +324,7 @@ export const GameScreen = ({
           className="mb-2 text-center text-sm font-medium text-white/75"
           aria-live="polite"
         >
-          {prompt(game)}
+          {prompt(game, myMove)}
           {game.pendingAssign?.deferred && (
             <span className="ml-1 text-white/40">({UI.deferredHint})</span>
           )}
@@ -302,6 +334,7 @@ export const GameScreen = ({
           <RiskGauge
             odds={odds}
             protectedBySecondWind={actor.secondWind !== null}
+            who={myMove ? undefined : actor.name}
             className="mb-3"
           />
         )}

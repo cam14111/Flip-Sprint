@@ -66,12 +66,17 @@ export const UI = {
   hitHint: "Prendre une carte de plus",
   stayHint: "Encaisser et sortir de la course",
   openingDraw: "Prends ta carte de départ",
+  // Your own lane stays at the bottom of the screen whoever is playing, so the
+  // prompt is the line that says whose move it is: it has to switch out of the
+  // second person as soon as the runner acting is not you.
+  openingDrawOther: (name: string) => `${name} prend sa carte de départ`,
 
   // --- Targeting ----------------------------------------------------------
   chooseTarget: "Choisis un coureur",
   chooseTargetWhistle: "Qui siffles-tu ?",
   chooseTargetBurst: "Qui prend la rafale ?",
   chooseTargetSecondWind: "À qui donnes-tu ce second souffle ?",
+  chooseTargetOther: (name: string) => `${name} choisit une cible`,
   deferredHint: "Mise de côté pendant la rafale",
   targetSelf: "Toi",
 

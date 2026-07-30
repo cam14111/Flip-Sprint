@@ -21,6 +21,11 @@ const LIVE = process.argv.includes("--live");
 const VITE_PORT = 8123;
 const BASE = `http://127.0.0.1:${VITE_PORT}/`;
 
+// The two runners are named apart so a check can tell whose lane it is looking
+// at. Fourteen characters is the field's limit.
+const HOST_NAME = "Hote";
+const GUEST_NAME = "Invite";
+
 let passed = 0;
 const failures = [];
 const check = (ok, label) => {
@@ -87,7 +92,7 @@ const main = async () => {
     });
 
     /** One phone. Each gets its own context so the anonymous uids differ. */
-    const openPhone = async (label) => {
+    const openPhone = async (label, runner) => {
       const context = await browser.newContext({
         viewport: { width: 390, height: 844 },
       });
@@ -103,17 +108,20 @@ const main = async () => {
           console.error(`      ${label} → ${text.slice(0, 220)}`);
         }
       });
-      return { label, context, page };
+      return { label, runner, context, page };
     };
 
-    const host = await openPhone("hôte");
-    const guest = await openPhone("invité");
+    const host = await openPhone("hôte", HOST_NAME);
+    const guest = await openPhone("invité", GUEST_NAME);
 
     // ---- Create -----------------------------------------------------------
     console.log("\ncréation du salon");
     await host.page.goto(BASE, { waitUntil: "networkidle" });
     await host.page.evaluate(() => localStorage.clear());
     await host.page.reload({ waitUntil: "networkidle" });
+    // Distinct names, so the checks below can tell the two phones' lanes apart
+    // — left to the default, both runners would be called "Toi".
+    await host.page.getByPlaceholder("Toi").fill(HOST_NAME);
     await host.page.getByRole("button", { name: "En ligne" }).click();
     await host.page.getByRole("button", { name: /Jouer/ }).click();
 
@@ -134,6 +142,12 @@ const main = async () => {
 
     // ---- Join -------------------------------------------------------------
     console.log("\narrivée de l'invité");
+    // The invite link goes straight to the board, so the name has to be set on
+    // the home screen first — it is read from this device's own settings.
+    await guest.page.goto(BASE, { waitUntil: "networkidle" });
+    await guest.page.evaluate(() => localStorage.clear());
+    await guest.page.reload({ waitUntil: "networkidle" });
+    await guest.page.getByPlaceholder("Toi").fill(GUEST_NAME);
     await guest.page.goto(`${BASE}?join=${code}`, { waitUntil: "networkidle" });
 
     // Either both seats fill (and we can see it), or the race has already
@@ -178,6 +192,30 @@ const main = async () => {
     }
     check(!!oneActs, "un seul appareil a la main, l'autre attend");
 
+    // Each phone keeps its own lane at the bottom of the screen, including —
+    // and especially — the one that is only watching. Anything else means your
+    // cards jump into the rivals' strip the moment somebody else acts.
+    //
+    // The lane pinned at the bottom is the last one in the document; a lane
+    // names its runner in its aria-label, under either of the two wordings it
+    // takes (plain, or offered as a target).
+    const bottomName = async (page) => {
+      const labels = await page
+        .locator('[aria-label^="Couloir de "], [aria-label^="Choisir "]')
+        .evaluateAll((nodes) =>
+          nodes.map((n) => n.getAttribute("aria-label") ?? "")
+        );
+      return (labels.at(-1) ?? "")
+        .replace(/^Couloir de /, "")
+        .replace(/^Choisir /, "");
+    };
+    const bottomIsMine = async (phone) =>
+      (await bottomName(phone.page)) === phone.runner;
+    check(
+      (await bottomIsMine(host)) && (await bottomIsMine(guest)),
+      "chaque appareil garde son propre couloir en bas, même en attendant"
+    );
+
     // ---- Play -------------------------------------------------------------
     console.log("\ndéroulement de la course");
     const phones = [host, guest];
@@ -214,11 +252,17 @@ const main = async () => {
 
     let moves = 0;
     let raceScored = false;
+    let anchorBreaks = 0;
     for (let step = 0; step < 160 && !raceScored; step++) {
       const next = phones[0].page.getByRole("button", { name: "Course suivante" });
       if (await next.count()) {
         raceScored = true;
         break;
+      }
+      // The anchoring has to hold at every point of the race, not just at the
+      // start: the initiative changes hands on almost every move.
+      for (const phone of phones) {
+        if (!(await bottomIsMine(phone))) anchorBreaks++;
       }
       if (await playOneMove()) {
         moves++;
@@ -229,6 +273,10 @@ const main = async () => {
     }
     check(moves > 4, `des coups ont été joués de part et d'autre (${moves})`);
     check(raceScored, "la course va jusqu'à son décompte");
+    check(
+      anchorBreaks === 0,
+      `le couloir du bas ne bouge jamais pendant la course (${anchorBreaks} écart(s))`
+    );
 
     // ---- Both devices agree ----------------------------------------------
     console.log("\ncohérence entre appareils");

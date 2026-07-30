@@ -199,6 +199,7 @@ const AppInner = () => {
             onOpenMenu={() => setPanel("menu")}
             showRisk={settings.showRisk}
             busy={aiThinking}
+            mySeat={humanSeat}
           />
           <Overlays
             game={game}

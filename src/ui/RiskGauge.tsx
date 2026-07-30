@@ -12,10 +12,18 @@ import { cn } from "@/lib/utils";
 export const RiskGauge = ({
   odds,
   protectedBySecondWind,
+  who,
   className,
 }: {
   odds: DrawOdds;
   protectedBySecondWind: boolean;
+  /**
+   * Whose risk this is, when it is not the reader's own. The gauge sits under
+   * your lane, so an unlabelled figure there would read as yours — and naming
+   * the runner beats hiding the gauge, which made the buttons jump on every
+   * turn. Watching a rival's odds climb is half the fun anyway.
+   */
+  who?: string;
   className?: string;
 }) => {
   const percent = odds.cramp * 100;
@@ -35,8 +43,9 @@ export const RiskGauge = ({
   return (
     <div className={cn("select-none", className)}>
       <div className="mb-1 flex items-baseline justify-between">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-white/45">
+        <span className="truncate text-[11px] font-medium uppercase tracking-wide text-white/45">
           {UI.riskLabel}
+          {who && <span className="normal-case text-white/60"> · {who}</span>}
         </span>
         <span
           className={cn(

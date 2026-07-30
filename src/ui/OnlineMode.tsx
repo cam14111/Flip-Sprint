@@ -420,6 +420,7 @@ export const OnlineMode = ({
         onOpenMenu={() => setMenuOpen(true)}
         showRisk={settings.showRisk}
         busy={!snap.myTurn}
+        mySeat={snap.mySeat}
         presence={snap.players}
         waitingFor={
           snap.myTurn ? null : snap.players[snap.game.actor]?.name ?? null

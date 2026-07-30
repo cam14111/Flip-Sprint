@@ -187,8 +187,8 @@ npm test               # moteur, IA, rejeu — 94 tests
 npm run lint
 npm run build          # typecheck + build de production
 npm run smoke          # joue une partie locale entière dans un vrai navigateur
-npm run test:rules     # 29 sondes de sécurité contre l'émulateur
-npm run e2e:online     # deux navigateurs, une vraie course en ligne
+npm run test:rules     # 34 sondes de sécurité contre l'émulateur
+npm run e2e:online     # deux navigateurs, une vraie course en ligne (14 vérifs)
 ```
 
 Les deux derniers demandent **Java** (l'émulateur Realtime Database est un
