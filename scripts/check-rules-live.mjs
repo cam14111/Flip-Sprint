@@ -136,6 +136,28 @@ try {
     await denied(() => set(ref(db, `secrets/${code}`), { c1: { d: { 0: 12 } } })),
     "réécrire l'arbre des secrets est refusé (correction en place)"
   );
+
+  // And the one that tells whether the Coups bas rules are deployed at all.
+  // The variant needs two phases the previous rules had never heard of; under
+  // them this write is refused and the online variant simply cannot progress.
+  const coupsBas = await allowed(() =>
+    update(ref(db, `games/${code}/state`), {
+      course: "c1",
+      next: "a0000",
+      actor: "0",
+      phase: "picking",
+      cursorRef: "d/0",
+      nextCourse: "c2",
+    })
+  );
+  check(coupsBas, "les phases de Coups bas sont acceptées");
+  if (!coupsBas) {
+    console.error(
+      "\n  → Les règles déployées sont ANTÉRIEURES à Coups bas. Le mode en\n" +
+        "    ligne de la variante sera bloqué tant qu'elles ne sont pas\n" +
+        "    republiées :  npx firebase deploy --only database"
+    );
+  }
 } finally {
   const cleaned = await allowed(() =>
     update(ref(db), { [`games/${code}`]: null, [`secrets/${code}`]: null })
