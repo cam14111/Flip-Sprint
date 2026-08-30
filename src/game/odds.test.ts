@@ -29,7 +29,7 @@ describe("les cartes encore possibles", () => {
   it("décrivent exactement la pioche au début d'une course", () => {
     const game = createGame({ names: ["A", "B"], seed: 42 });
     const counts = drawableCounts(game);
-    expect(totalOf(counts)).toBe(DECK_SIZE);
+    expect(totalOf(counts)).toBe(DECK_SIZE.classique);
     expect(totalOf(counts)).toBe(game.deck.length);
     expect(counts).toEqual(deckComposition());
   });

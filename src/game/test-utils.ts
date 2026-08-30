@@ -53,7 +53,7 @@ export const checkInvariants = (state: GameState, deckSize: number): void => {
   const ids = new Set(cards.map((c) => c.id));
   if (ids.size !== cards.length) throw new Error("duplicate card id in play");
 
-  if (deckSize === DECK_SIZE) {
+  if (deckSize === DECK_SIZE.classique) {
     // The drawable composition must describe exactly the deck that is left.
     let drawable = 0;
     for (const n of drawableCounts(state).values()) {

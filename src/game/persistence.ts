@@ -63,7 +63,14 @@ export const loadGame = (): GameState | null => {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Envelope;
     if (parsed?.version !== VERSION) return null;
-    return isValidGameState(parsed.state) ? parsed.state : null;
+    if (!isValidGameState(parsed.state)) return null;
+    // A game saved before Coups bas existed carries no ruleset. It was played
+    // under the original rules, so that is what it resumes under.
+    return {
+      ...parsed.state,
+      ruleset: parsed.state.ruleset ?? "classique",
+      brutal: parsed.state.brutal ?? false,
+    };
   } catch {
     return null;
   }

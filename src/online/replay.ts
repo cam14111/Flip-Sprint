@@ -15,6 +15,7 @@ import {
   Card,
   CardCode,
   Difficulty,
+  RulesetId,
   GameState,
   RunnerState,
 } from "@/game/types";
@@ -31,6 +32,12 @@ export interface ReplayConfig {
   names: string[];
   scoreLimit: number;
   roundLimit: number | null;
+  /**
+   * Which rules the lobby was created under. Absent on a game started before
+   * Coups bas existed, which is exactly the original deck.
+   */
+  ruleset?: RulesetId;
+  brutal?: boolean;
   /** Seats actually playing this game (start.count). */
   playerCount: number;
 }
@@ -90,6 +97,8 @@ export const initialCourseState = (
     }
   );
 
+  const ruleset: RulesetId = config.ruleset ?? "classique";
+
   // The opening deal moves one seat left each course, exactly as the local
   // engine does — the two must agree or replay would diverge from a solo game.
   const seats = players.flatMap((p, seat) => (p.out ? [] : [seat]));
@@ -105,13 +114,15 @@ export const initialCourseState = (
     deferred: [],
     burstQueue: [],
     pendingAssign: null,
-    deck: Array.from({ length: DECK_SIZE }, (_, i) => placeholder(i)),
+    deck: Array.from({ length: DECK_SIZE[ruleset] }, (_, i) => placeholder(i)),
     discard: [],
     round: course,
     scoreLimit: config.scoreLimit,
     roundLimit: config.roundLimit,
     // Unused online (no AI runners), but part of the state shape.
     difficulty: "normal" as Difficulty,
+    ruleset,
+    brutal: ruleset === "coupsbas" && (config.brutal ?? false),
     events: [],
     // Fixed seed: the engine's reshuffle, should the deck ever run dry, has to
     // produce the same order on every device.

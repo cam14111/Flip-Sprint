@@ -3,8 +3,13 @@
 
 import {
   bonusValue,
+  COUP_DE_BARRE,
+  FAUX_DEPART,
   isBonusCard,
   isNumberCard,
+  isPenaltyCard,
+  numberValue,
+  penaltyValue,
   PERFECT_BONUS,
   RunnerState,
   TURBO,
@@ -16,13 +21,28 @@ import {
 // ---------------------------------------------------------------------------
 
 export const laneNumbers = (runner: RunnerState): number[] =>
-  runner.lane.flatMap((c) => (isNumberCard(c.code) ? [c.code] : []));
+  runner.lane.flatMap((c) => {
+    const value = numberValue(c.code);
+    return value === null ? [] : [value];
+  });
 
 export const numberCount = (runner: RunnerState): number =>
   runner.lane.reduce((n, c) => (isNumberCard(c.code) ? n + 1 : n), 0);
 
+/**
+ * Whether the lane already holds that number — the duplicate check the whole
+ * game turns on. Goes through `numberValue`, so Le Mur collides with a plain 7
+ * and the Dossard fétiche with a plain 13.
+ */
 export const hasNumber = (runner: RunnerState, value: number): boolean =>
-  runner.lane.some((c) => c.code === value);
+  runner.lane.some((c) => numberValue(c.code) === value);
+
+/** How many cards of that value the lane holds (the Dossard fétiche allows 2). */
+export const countNumber = (runner: RunnerState, value: number): number =>
+  runner.lane.reduce((n, c) => (numberValue(c.code) === value ? n + 1 : n), 0);
+
+export const holdsCard = (runner: RunnerState, code: number): boolean =>
+  runner.lane.some((c) => c.code === code);
 
 export const hasTurbo = (runner: RunnerState): boolean =>
   runner.lane.some((c) => c.code === TURBO);
@@ -30,20 +50,39 @@ export const hasTurbo = (runner: RunnerState): boolean =>
 export const laneBonuses = (runner: RunnerState): number[] =>
   runner.lane.flatMap((c) => (isBonusCard(c.code) ? [bonusValue(c.code)] : []));
 
+export const lanePenalties = (runner: RunnerState): number[] =>
+  runner.lane.flatMap((c) => (isPenaltyCard(c.code) ? [penaltyValue(c.code)] : []));
+
 /**
- * What a lane is worth. Turbo doubles the *number cards only*; Bonus cards are
- * added afterwards, and the Sprint parfait bonus on top of that. A cramp wipes
- * everything, modifiers included.
+ * What a lane is worth.
+ *
+ * One function for both rulesets, because the two decks never share a card:
+ * a Turbo only ever sits in a classique lane, a Coup de barre only ever in a
+ * Coups bas one. So the order below reads as the union of the two rules, and
+ * each ruleset only ever exercises its own half.
+ *
+ *   numbers → ×2 (Turbo) → ÷2 (Coup de barre, rounded down)
+ *           → + bonuses − penalties → floor at 0 → +15 for a Sprint parfait
+ *
+ * `brutal` is the Nuit noire option: it lifts the floor, so a race can end
+ * below zero.
  */
-export const laneScore = (runner: RunnerState): number => {
+export const laneScore = (runner: RunnerState, brutal = false): number => {
   if (runner.status === "cramped") return 0;
-  const numbers = laneNumbers(runner).reduce((sum, v) => sum + v, 0);
-  const bonuses = laneBonuses(runner).reduce((sum, v) => sum + v, 0);
-  return (
-    numbers * (hasTurbo(runner) ? 2 : 1) +
-    bonuses +
-    (runner.perfect ? PERFECT_BONUS : 0)
-  );
+
+  let total = laneNumbers(runner).reduce((sum, v) => sum + v, 0);
+  if (hasTurbo(runner)) total *= 2;
+  if (holdsCard(runner, COUP_DE_BARRE)) total = Math.floor(total / 2);
+
+  total += laneBonuses(runner).reduce((sum, v) => sum + v, 0);
+  total -= lanePenalties(runner).reduce((sum, v) => sum + v, 0);
+
+  // The Faux départ condemns the race to nothing — unless its holder redeems
+  // it with a Sprint parfait, in which case the lane scores normally.
+  if (holdsCard(runner, FAUX_DEPART) && !runner.perfect) return 0;
+
+  if (!brutal) total = Math.max(0, total);
+  return total + (runner.perfect ? PERFECT_BONUS : 0);
 };
 
 /** Highest total among runners still in the game. */

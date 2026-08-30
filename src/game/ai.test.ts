@@ -50,7 +50,7 @@ const playAiGame = (
     if (next === state) {
       throw new Error(`AI played an illegal ${action.type} in ${state.phase}`);
     }
-    checkInvariants(next, DECK_SIZE);
+    checkInvariants(next, DECK_SIZE.classique);
     state = next;
   }
   throw new Error("AI game never finished");

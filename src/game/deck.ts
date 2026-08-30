@@ -1,4 +1,4 @@
-// The 94-card deck, and the deterministic shuffle every device must agree on.
+// The two decks, and the deterministic shuffle every device must agree on.
 
 import {
   BONUS_10,
@@ -9,13 +9,29 @@ import {
   BURST,
   Card,
   CardCode,
+  COUP_DE_BARRE,
+  DOSSARD_FETICHE,
+  DRAFT,
+  FAUX_DEPART,
+  HIGHEST_NUMBER,
+  LAST_STRAIGHT,
+  LE_MUR,
   MAX_NUMBER,
+  PENALTY_10,
+  PENALTY_2,
+  PENALTY_4,
+  PENALTY_6,
+  PENALTY_8,
+  RELAY,
+  RulesetId,
   SECOND_WIND,
+  SQUALL,
+  STUMBLE,
   TURBO,
   WHISTLE,
 } from "./types";
 
-/** Copies of each number card: one `0`, one `1`, two `2` … twelve `12`. */
+/** Copies of each number card: one `0`, one `1`, two `2` … *N* of *N*. */
 export const numberCopies = (value: number): number => (value === 0 ? 1 : value);
 
 export const MODIFIER_CODES: CardCode[] = [
@@ -31,22 +47,78 @@ export const MODIFIER_CODES: CardCode[] = [
 export const ACTION_CODES: CardCode[] = [WHISTLE, BURST, SECOND_WIND];
 export const ACTION_COPIES = 3;
 
-/** 79 number cards + 6 modifiers + 9 action cards. */
-export const DECK_SIZE = 94;
+/** One of each penalty, and the Coup de barre. */
+export const PENALTY_CODES: CardCode[] = [
+  PENALTY_2,
+  PENALTY_4,
+  PENALTY_6,
+  PENALTY_8,
+  PENALTY_10,
+  COUP_DE_BARRE,
+];
 
-/** The deck's full composition, as a code -> count map. */
-export const deckComposition = (): Map<CardCode, number> => {
+/** Two of each nasty action. */
+export const COUPS_BAS_ACTION_CODES: CardCode[] = [
+  LAST_STRAIGHT,
+  SQUALL,
+  RELAY,
+  DRAFT,
+  STUMBLE,
+];
+export const COUPS_BAS_ACTION_COPIES = 2;
+
+/**
+ * classique — 79 number cards + 6 modifiers + 9 action cards.
+ * coupsbas  — 92 number cards + 6 penalties + 10 action cards.
+ */
+export const DECK_SIZE: Record<RulesetId, number> = {
+  classique: 94,
+  coupsbas: 108,
+};
+
+/** Highest number card in each deck: Coups bas adds thirteen 13s. */
+export const TOP_NUMBER: Record<RulesetId, number> = {
+  classique: MAX_NUMBER,
+  coupsbas: HIGHEST_NUMBER,
+};
+
+/**
+ * The deck's full composition, as a code -> count map.
+ *
+ * In Coups bas three of the 92 number cards are singular: the lone 0 IS the
+ * Faux départ, one of the seven 7s is Le Mur, and one of the thirteen 13s is
+ * the Dossard fétiche. They are drawn from the same allowance, so the count
+ * stays 92 — a plain 7 simply has six copies instead of seven.
+ */
+export const deckComposition = (
+  ruleset: RulesetId = "classique"
+): Map<CardCode, number> => {
   const counts = new Map<CardCode, number>();
-  for (let v = 0; v <= MAX_NUMBER; v++) counts.set(v, numberCopies(v));
-  for (const code of MODIFIER_CODES) counts.set(code, 1);
-  for (const code of ACTION_CODES) counts.set(code, ACTION_COPIES);
+  for (let v = 0; v <= TOP_NUMBER[ruleset]; v++) counts.set(v, numberCopies(v));
+
+  if (ruleset === "classique") {
+    for (const code of MODIFIER_CODES) counts.set(code, 1);
+    for (const code of ACTION_CODES) counts.set(code, ACTION_COPIES);
+    return counts;
+  }
+
+  counts.set(0, 0);
+  counts.set(FAUX_DEPART, 1);
+  counts.set(7, numberCopies(7) - 1);
+  counts.set(LE_MUR, 1);
+  counts.set(13, numberCopies(13) - 1);
+  counts.set(DOSSARD_FETICHE, 1);
+  for (const code of PENALTY_CODES) counts.set(code, 1);
+  for (const code of COUPS_BAS_ACTION_CODES) {
+    counts.set(code, COUPS_BAS_ACTION_COPIES);
+  }
   return counts;
 };
 
 /** A fresh, ordered deck (before shuffling). */
-export const buildDeck = (): CardCode[] => {
+export const buildDeck = (ruleset: RulesetId = "classique"): CardCode[] => {
   const codes: CardCode[] = [];
-  for (const [code, count] of deckComposition()) {
+  for (const [code, count] of deckComposition(ruleset)) {
     for (let i = 0; i < count; i++) codes.push(code);
   }
   return codes;
@@ -99,8 +171,11 @@ export const shuffle = <T>(
  * ("d/0", "d/1", …), which keeps replay bookkeeping trivial: the k-th card
  * drawn in a race is always `d/k`.
  */
-export const dealDeck = (seed: number): { cards: Card[]; state: number } => {
-  const { items, state } = shuffle(buildDeck(), seed);
+export const dealDeck = (
+  seed: number,
+  ruleset: RulesetId = "classique"
+): { cards: Card[]; state: number } => {
+  const { items, state } = shuffle(buildDeck(ruleset), seed);
   return {
     cards: items.map((code, i) => ({ id: `d/${i}`, code })),
     state,

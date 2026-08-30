@@ -36,7 +36,7 @@ const playRandomGame = (
 ): RunResult => {
   const names = Array.from({ length: playerCount }, (_, i) => `J${i + 1}`);
   let state = createGame({ names, seed, scoreLimit: 200 });
-  checkInvariants(state, DECK_SIZE);
+  checkInvariants(state, DECK_SIZE.classique);
 
   const rand = makeRng(seed);
   let steps = 0;
@@ -50,7 +50,7 @@ const playRandomGame = (
     if (state.phase === "roundOver") {
       state = dealNextRound(state);
       rounds++;
-      checkInvariants(state, DECK_SIZE);
+      checkInvariants(state, DECK_SIZE.classique);
       continue;
     }
 
@@ -58,7 +58,7 @@ const playRandomGame = (
     if (opts.forfeitAt === steps && playerCount > MIN_RUNNERS) {
       const victim = Math.floor(rand() * playerCount);
       const next = forfeitRunner(state, victim);
-      checkInvariants(next, DECK_SIZE);
+      checkInvariants(next, DECK_SIZE.classique);
       state = next;
       continue;
     }
@@ -72,7 +72,7 @@ const playRandomGame = (
     if (next === state) {
       throw new Error(`legal action rejected in phase ${state.phase}`);
     }
-    checkInvariants(next, DECK_SIZE);
+    checkInvariants(next, DECK_SIZE.classique);
     state = next;
   }
 

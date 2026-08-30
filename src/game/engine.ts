@@ -12,7 +12,8 @@
 //    out by the target afterwards. Every legality question — here, in the wire
 //    protocol and in the database rules — is asked about `actor`.
 
-import { dealDeck, shuffle } from "./deck";
+import { dealDeck } from "./deck";
+import { patchRunner, takeCard, toDiscard, withEvent } from "./state";
 import {
   activeCount,
   activeSeats,
@@ -28,12 +29,12 @@ import {
   Card,
   Difficulty,
   GameAction,
-  GameEvent,
   GameMode,
   GameState,
   isModifierCard,
   isNumberCard,
   PERFECT_COUNT,
+  RulesetId,
   RunnerState,
   SECOND_WIND,
   TURBO,
@@ -43,28 +44,6 @@ import {
 export const MIN_RUNNERS = 2;
 export const MAX_RUNNERS = 8;
 export const DEFAULT_SCORE_LIMIT = 200;
-
-// ---------------------------------------------------------------------------
-// Small immutable helpers
-// ---------------------------------------------------------------------------
-
-const withEvent = (state: GameState, event: GameEvent): GameState => ({
-  ...state,
-  events: [...state.events, event],
-});
-
-const patchRunner = (
-  state: GameState,
-  seat: number,
-  patch: (runner: RunnerState) => RunnerState
-): GameState => {
-  const players = state.players.slice();
-  players[seat] = patch(players[seat]);
-  return { ...state, players };
-};
-
-const toDiscard = (state: GameState, cards: Card[]): GameState =>
-  cards.length === 0 ? state : { ...state, discard: [...state.discard, ...cards] };
 
 // ---------------------------------------------------------------------------
 // Game setup
@@ -79,6 +58,10 @@ export interface CreateGameOptions {
   /** "Éclair": stop after this many races instead of at a score. */
   roundLimit?: number | null;
   difficulty?: Difficulty;
+  /** Which rules to play under. Defaults to the original deck. */
+  ruleset?: RulesetId;
+  /** Coups bas "Nuit noire": race scores may go below zero. */
+  brutal?: boolean;
   seed?: number;
 }
 
@@ -120,7 +103,8 @@ export const createGame = (opts: CreateGameOptions = {}): GameState => {
   );
 
   const seed = opts.seed ?? 1;
-  const { cards, state: rngState } = dealDeck(seed);
+  const ruleset = opts.ruleset ?? "classique";
+  const { cards, state: rngState } = dealDeck(seed, ruleset);
 
   return {
     mode: opts.mode ?? "local",
@@ -138,6 +122,9 @@ export const createGame = (opts: CreateGameOptions = {}): GameState => {
     scoreLimit: opts.scoreLimit ?? DEFAULT_SCORE_LIMIT,
     roundLimit: opts.roundLimit ?? null,
     difficulty: opts.difficulty ?? "normal",
+    ruleset,
+    // Nuit noire is a Coups bas option; it means nothing under classique rules.
+    brutal: ruleset === "coupsbas" && (opts.brutal ?? false),
     events: [],
     rngState,
   };
@@ -145,7 +132,7 @@ export const createGame = (opts: CreateGameOptions = {}): GameState => {
 
 /** Starts the next race, carrying totals over. */
 export const dealNextRound = (prev: GameState): GameState => {
-  const { cards, state: rngState } = dealDeck(prev.rngState);
+  const { cards, state: rngState } = dealDeck(prev.rngState, prev.ruleset);
   const players = prev.players.map(resetForRace);
   const round = prev.round + 1;
 
@@ -174,27 +161,6 @@ export const dealNextRound = (prev: GameState): GameState => {
 // ---------------------------------------------------------------------------
 // Drawing
 // ---------------------------------------------------------------------------
-
-/**
- * Takes the top card, reshuffling the discard back in if the deck ran dry.
- * A race can consume at most the whole deck, so this is close to theoretical —
- * but it has to be deterministic, hence the in-state RNG rather than a fresh
- * random source.
- */
-const takeCard = (
-  state: GameState
-): { state: GameState; card: Card } | null => {
-  let s = state;
-  if (s.deck.length === 0) {
-    if (s.discard.length === 0) return null;
-    const { items, state: rngState } = shuffle(s.discard, s.rngState);
-    s = withEvent(
-      { ...s, deck: items, discard: [], rngState },
-      { type: "reshuffle" }
-    );
-  }
-  return { state: { ...s, deck: s.deck.slice(1) }, card: s.deck[0] };
-};
 
 // ---------------------------------------------------------------------------
 // Targeting
@@ -343,7 +309,9 @@ const isGameOver = (state: GameState, players: RunnerState[]): boolean => {
 };
 
 export const endRound = (state: GameState): GameState => {
-  const scores = state.players.map((p) => (p.out ? 0 : laneScore(p)));
+  const scores = state.players.map((p) =>
+    p.out ? 0 : laneScore(p, state.brutal)
+  );
   // Everything still in flight leaves play too — a Sprint parfait can end the
   // race while cards are set aside or awaiting a target.
   const spent: Card[] = [

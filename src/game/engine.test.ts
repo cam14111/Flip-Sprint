@@ -24,7 +24,7 @@ import {
 const play = (
   state: GameState,
   actions: GameAction[],
-  deckSize = DECK_SIZE
+  deckSize = DECK_SIZE.classique
 ): GameState => {
   let s = state;
   for (const action of actions) {
