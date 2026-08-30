@@ -2,15 +2,17 @@ import { Menu } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { UI, cardName } from "@/game/copy";
-import { canStay, legalTargets } from "@/game/engine";
+import { canStay, legalCardPicks, legalTargets } from "@/game/engine";
 import { drawOdds } from "@/game/odds";
 import {
   BURST,
   Card as CardType,
+  DRAFT,
   GameAction,
   GameState,
   isNumberCard,
   SECOND_WIND,
+  STUMBLE,
   WHISTLE,
 } from "@/game/types";
 import { cn } from "@/lib/utils";
@@ -45,6 +47,15 @@ const prompt = (game: GameState, myMove: boolean): string => {
       if (code === BURST) return UI.chooseTargetBurst;
       if (code === SECOND_WIND) return UI.chooseTargetSecondWind;
       return UI.chooseTarget;
+    }
+    case "picking": {
+      if (!myMove) return UI.chooseTargetOther(actor.name);
+      const code = game.pendingAssign?.card.code;
+      if (code === DRAFT) return UI.pickSteal;
+      if (code === STUMBLE) return UI.pickStumble;
+      return game.pendingAssign?.firstRef === undefined
+        ? UI.pickRelayFirst
+        : UI.pickRelaySecond;
     }
     default:
       return "";
@@ -158,6 +169,12 @@ export const GameScreen = ({
     [game]
   );
   const targeting = targets.length > 0;
+  const picking = game.phase === "picking";
+  const picks = useMemo(
+    () => (picking ? legalCardPicks(game) : []),
+    [game, picking]
+  );
+  const pick = (ref: string) => dispatch({ type: "pick", ref });
   const crampSeat = useCrampFlash(game);
   const lastDrawn = useLastDrawn(game);
   const roomy = useRoomy();
@@ -273,6 +290,10 @@ export const GameScreen = ({
               onTarget={() => dispatch({ type: "assign", target: seat })}
               cramping={crampSeat === seat}
               offline={presence?.[seat]?.online === false}
+              pickable={interactive ? picks : []}
+              onPick={pick}
+              picking={picking}
+              brutal={game.brutal}
               className={cn(!stacked && "w-40 shrink-0")}
             />
           ))}
@@ -326,6 +347,10 @@ export const GameScreen = ({
           onTarget={() => dispatch({ type: "assign", target: bottomSeat })}
           cramping={crampSeat === bottomSeat}
           offline={presence?.[bottomSeat]?.online === false}
+          pickable={interactive ? picks : []}
+          onPick={pick}
+          picking={picking}
+          brutal={game.brutal}
         />
       </div>
 
@@ -360,6 +385,10 @@ export const GameScreen = ({
         ) : targeting ? (
           <p className="py-2 text-center text-xs text-white/45">
             Touche un couloir pour choisir
+          </p>
+        ) : picking ? (
+          <p className="py-2 text-center text-xs text-white/45">
+            {UI.pickHint}
           </p>
         ) : (
           <div className="flex gap-2">

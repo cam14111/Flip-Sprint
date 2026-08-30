@@ -1,4 +1,4 @@
-import { STATUS_LABEL } from "@/game/copy";
+import { cardName, STATUS_LABEL } from "@/game/copy";
 import { laneScore, numberCount } from "@/game/scoring";
 import { PERFECT_COUNT, RunnerState } from "@/game/types";
 import { cn } from "@/lib/utils";
@@ -33,6 +33,16 @@ export interface LaneProps {
   cramping?: boolean;
   /** Online: this runner's device is not currently connected. */
   offline?: boolean;
+  /**
+   * Coups bas: the cards in THIS lane the actor may point at right now. An
+   * Aspiration, un Faux pas or a Relais needs a card, not just a runner.
+   */
+  pickable?: readonly string[];
+  onPick?: (ref: string) => void;
+  /** Somebody is choosing a card, so the ones they cannot take step back. */
+  picking?: boolean;
+  /** Nuit noire: the running total may be negative. */
+  brutal?: boolean;
   compact?: boolean;
   className?: string;
 }
@@ -46,10 +56,14 @@ export const Lane = ({
   onTarget,
   cramping,
   offline,
+  pickable,
+  onPick,
+  picking,
+  brutal,
   compact,
   className,
 }: LaneProps) => {
-  const score = laneScore(runner);
+  const score = laneScore(runner, brutal);
   const numbers = numberCount(runner);
 
   return (
@@ -147,14 +161,41 @@ export const Lane = ({
             {runner.status === "cramped" ? "Couloir vidé" : "Couloir vide"}
           </span>
         ) : (
-          runner.lane.map((card, i) => (
-            <Card
-              key={card.id}
-              code={card.code}
-              size={size}
-              dealDelay={i === runner.lane.length - 1 ? 0 : undefined}
-            />
-          ))
+          runner.lane.map((card, i) => {
+            const face = (
+              <Card
+                code={card.code}
+                size={size}
+                dealDelay={i === runner.lane.length - 1 ? 0 : undefined}
+              />
+            );
+            if (pickable?.includes(card.id)) {
+              return (
+                <button
+                  key={card.id}
+                  type="button"
+                  aria-label={`Choisir ${cardName(card.code)}`}
+                  className="animate-pulse-ring rounded-[0.6em] ring-2 ring-neon-magenta/80"
+                  onClick={(e) => {
+                    // The lane itself may be a target; a card inside it is a
+                    // finer choice and must not be read as both.
+                    e.stopPropagation();
+                    onPick?.(card.id);
+                  }}
+                >
+                  {face}
+                </button>
+              );
+            }
+            return (
+              <div
+                key={card.id}
+                className={cn(picking && "opacity-35 transition-opacity")}
+              >
+                {face}
+              </div>
+            );
+          })
         )}
       </div>
 

@@ -1,4 +1,4 @@
-import { BookOpen, ChartBar, Play, Settings2, Wifi } from "lucide-react";
+import { BookOpen, ChartBar, Check, Play, Settings2, Wifi } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { APP_NAME, TAGLINE, UI } from "@/game/copy";
 import {
@@ -225,6 +225,63 @@ export const Home = ({
             </div>
           </Field>
         )}
+
+        <Field label="Règles">
+          <div className="grid grid-cols-2 gap-1.5">
+            <Chip
+              active={settings.ruleset === "classique"}
+              onClick={() => onChange({ ruleset: "classique" })}
+            >
+              {UI.rulesetClassique}
+            </Chip>
+            <Chip
+              active={settings.ruleset === "coupsbas"}
+              onClick={() => onChange({ ruleset: "coupsbas" })}
+            >
+              {UI.rulesetCoupsBas}
+            </Chip>
+          </div>
+          {settings.ruleset === "coupsbas" && (
+            <>
+              <p className="mt-1.5 text-[11px] text-white/40">
+                {UI.coupsBasHint}
+              </p>
+              <button
+                type="button"
+                onClick={() => onChange({ brutal: !settings.brutal })}
+                aria-pressed={settings.brutal}
+                className={cn(
+                  "mt-2 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left ring-1 transition-colors",
+                  settings.brutal
+                    ? "bg-rose-500/15 ring-rose-400/50"
+                    : "bg-white/5 ring-white/10"
+                )}
+              >
+                <span
+                  className={cn(
+                    "grid h-4 w-4 shrink-0 place-items-center rounded border",
+                    settings.brutal
+                      ? "border-rose-300 bg-rose-400 text-rose-950"
+                      : "border-white/30"
+                  )}
+                  aria-hidden
+                >
+                  {settings.brutal && (
+                    <Check size={11} strokeWidth={4} />
+                  )}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-[13px] font-bold leading-none">
+                    {UI.brutalLabel}
+                  </span>
+                  <span className="mt-0.5 block text-[11px] leading-tight text-white/45">
+                    {UI.brutalHint}
+                  </span>
+                </span>
+              </button>
+            </>
+          )}
+        </Field>
 
         <Field label="Format">
           <div className="grid grid-cols-3 gap-1.5">

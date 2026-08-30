@@ -8,7 +8,25 @@
 // Everything is drawn in CSS. No image is ever loaded: the cards stay razor
 // sharp at any size, weigh nothing offline, and animate freely.
 
-import { isBonusCard, isNumberCard, BURST, CardCode, SECOND_WIND, TURBO, WHISTLE } from "@/game/types";
+import {
+  BURST,
+  CardCode,
+  COUP_DE_BARRE,
+  DOSSARD_FETICHE,
+  DRAFT,
+  FAUX_DEPART,
+  isBonusCard,
+  isNumberCard,
+  isPenaltyCard,
+  LAST_STRAIGHT,
+  LE_MUR,
+  RELAY,
+  SECOND_WIND,
+  SQUALL,
+  STUMBLE,
+  TURBO,
+  WHISTLE,
+} from "@/game/types";
 
 export interface CardSkin {
   /** Gradient stops for the card face. */
@@ -48,11 +66,64 @@ const HOT: CardSkin = {
   glow: "#fda4c0",
 };
 
+/** Coups bas only: the 13 is the most dangerous number ever printed. */
+const BLAZING: CardSkin = {
+  from: "#ff7a45",
+  to: "#a4133c",
+  text: "#ffffff",
+  glow: "#ffb199",
+};
+
 export const numberSkin = (value: number): CardSkin => {
   if (value === 0) return ZERO;
   if (value <= 4) return CALM;
   if (value <= 8) return WARM;
-  return HOT;
+  if (value <= 12) return HOT;
+  return BLAZING;
+};
+
+// --- Coups bas: the three special numbers ----------------------------------
+// Each one has to be unmistakable at a glance, because each one changes what
+// the lane is worth — and two of them are ruinous.
+
+/** A false start: the colour drains out of it. */
+export const FAUX_DEPART_SKIN: CardSkin = {
+  from: "#6b7280",
+  to: "#374151",
+  text: "#e5e7eb",
+  glow: "#9ca3af",
+};
+
+/** Hitting the wall: slate, cracked through with red. */
+export const LE_MUR_SKIN: CardSkin = {
+  from: "#4b5563",
+  to: "#1f2937",
+  text: "#fecaca",
+  glow: "#f87171",
+};
+
+/** The lucky bib: the only card on the table that glitters. */
+export const FETICHE_SKIN: CardSkin = {
+  from: "#fde68a",
+  to: "#b45309",
+  text: "#3a2405",
+  glow: "#fef3c7",
+};
+
+/** Penalties are the exact mirror of the Bonus cards: same shape, rusted. */
+export const PENALTY_SKIN: CardSkin = {
+  from: "#fb7185",
+  to: "#9f1239",
+  text: "#ffffff",
+  glow: "#fda4af",
+};
+
+/** And the Coup de barre is the negative of the Turbo. */
+export const COUP_DE_BARRE_SKIN: CardSkin = {
+  from: "#94a3b8",
+  to: "#334155",
+  text: "#f8fafc",
+  glow: "#cbd5e1",
 };
 
 /** Modifiers get a chrome treatment so they never read as a number. */
@@ -90,12 +161,51 @@ export const ACTION_SKINS: Record<number, CardSkin> = {
     text: "#6ee7b7",
     glow: "#34d399",
   },
+  // Coups bas. La Bourrasque garde la teinte de la Rafale : même geste, un
+  // cran au-dessus.
+  [SQUALL]: {
+    from: "#4a1338",
+    to: "#280a1e",
+    text: "#f9a8d4",
+    glow: "#f472b6",
+  },
+  [LAST_STRAIGHT]: {
+    from: "#4a3308",
+    to: "#241802",
+    text: "#fcd34d",
+    glow: "#fbbf24",
+  },
+  [RELAY]: {
+    from: "#2e1065",
+    to: "#170833",
+    text: "#c4b5fd",
+    glow: "#a78bfa",
+  },
+  [DRAFT]: {
+    from: "#0b3a45",
+    to: "#041d24",
+    text: "#5eead4",
+    glow: "#2dd4bf",
+  },
+  [STUMBLE]: {
+    from: "#3f2d17",
+    to: "#1f160a",
+    text: "#fdba74",
+    glow: "#fb923c",
+  },
 };
 
 export const cardSkin = (code: CardCode): CardSkin => {
+  // The specials are number cards, so they must be claimed before the generic
+  // branch reads their code as a value and paints Le Mur like a 41.
+  if (code === FAUX_DEPART) return FAUX_DEPART_SKIN;
+  if (code === LE_MUR) return LE_MUR_SKIN;
+  if (code === DOSSARD_FETICHE) return FETICHE_SKIN;
   if (isNumberCard(code)) return numberSkin(code);
   if (code === TURBO) return TURBO_SKIN;
   if (isBonusCard(code)) return BONUS_SKIN;
+  if (code === COUP_DE_BARRE) return COUP_DE_BARRE_SKIN;
+  if (isPenaltyCard(code)) return PENALTY_SKIN;
   return ACTION_SKINS[code] ?? ZERO;
 };
 

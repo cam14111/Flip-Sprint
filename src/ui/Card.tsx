@@ -4,8 +4,20 @@ import {
   BURST,
   bonusValue,
   CardCode,
+  COUP_DE_BARRE,
+  DOSSARD_FETICHE,
+  DRAFT,
+  FAUX_DEPART,
   isBonusCard,
   isNumberCard,
+  isPenaltyCard,
+  LAST_STRAIGHT,
+  LE_MUR,
+  numberValue,
+  penaltyValue,
+  RELAY,
+  SQUALL,
+  STUMBLE,
   SECOND_WIND,
   TURBO,
   WHISTLE,
@@ -53,10 +65,64 @@ const SecondWindGlyph = () => (
   </svg>
 );
 
+/** Four chevrons where the Rafale has three: the same gust, harder. */
+const SquallGlyph = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <path d="M2 6l4 3-4 3" />
+    <path d="M8 6l4 3-4 3" />
+    <path d="M14 6l4 3-4 3" />
+    <path d="M6 17h13" />
+  </svg>
+);
+
+/** A finish line, and a bar coming down after it. */
+const LastStraightGlyph = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <path d="M5 3v18" />
+    <path d="M9 5h10v6H9z" />
+    <path d="M9 8h10" />
+    <path d="M14 5v6" />
+    <path d="M8 17h11" />
+  </svg>
+);
+
+/** Two batons crossing: one card each way. */
+const RelayGlyph = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <path d="M3 8h13l-3-3" />
+    <path d="M21 16H8l3 3" />
+  </svg>
+);
+
+/** Slipstream: a card pulled out of the runner ahead. */
+const DraftGlyph = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <path d="M3 5h6" />
+    <path d="M3 10h9" />
+    <path d="M3 15h6" />
+    <path d="M14 12h7l-3-3" />
+    <path d="M21 12l-3 3" />
+  </svg>
+);
+
+/** A card slipping out of somebody's hands. */
+const StumbleGlyph = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <path d="M6 3h9v8H6z" />
+    <path d="M12 14l4 5" />
+    <path d="M16 14l-4 5" />
+  </svg>
+);
+
 const GLYPHS: Record<number, () => JSX.Element> = {
   [WHISTLE]: WhistleGlyph,
   [BURST]: BurstGlyph,
   [SECOND_WIND]: SecondWindGlyph,
+  [SQUALL]: SquallGlyph,
+  [LAST_STRAIGHT]: LastStraightGlyph,
+  [RELAY]: RelayGlyph,
+  [DRAFT]: DraftGlyph,
+  [STUMBLE]: StumbleGlyph,
 };
 
 /** Short label under an action card's glyph — dropped on the smallest sizes. */
@@ -64,11 +130,37 @@ const ACTION_LABEL: Record<number, string> = {
   [WHISTLE]: "SIFFLET",
   [BURST]: "RAFALE",
   [SECOND_WIND]: "SOUFFLE",
+  [SQUALL]: "BOURRASQUE",
+  [LAST_STRAIGHT]: "DERNIÈRE",
+  [RELAY]: "RELAIS",
+  [DRAFT]: "ASPIRATION",
+  [STUMBLE]: "FAUX PAS",
 };
 
-/** The text a face shows: "7", "+10", "×2". */
-const faceLabel = (code: CardCode): string =>
-  isBonusCard(code) ? `+${bonusValue(code)}` : code === TURBO ? "×2" : String(code);
+/**
+ * The text a face shows: "7", "+10", "×2", "−6", "÷2".
+ *
+ * The three Coups bas specials print the number they actually score as — a
+ * player must be able to read Le Mur as a 7 to see the duplicate coming.
+ * What sets them apart is their colour and the word underneath.
+ */
+const faceLabel = (code: CardCode): string => {
+  const value = numberValue(code);
+  if (value !== null) return String(value);
+  if (isBonusCard(code)) return `+${bonusValue(code)}`;
+  if (code === TURBO) return "×2";
+  if (code === COUP_DE_BARRE) return "÷2";
+  if (isPenaltyCard(code)) return `−${penaltyValue(code)}`;
+  return String(code);
+};
+
+/** The word under a special number or a penalty, so it cannot be mistaken. */
+const SPECIAL_LABEL: Record<number, string> = {
+  [FAUX_DEPART]: "FAUX DÉPART",
+  [LE_MUR]: "LE MUR",
+  [DOSSARD_FETICHE]: "FÉTICHE",
+  [COUP_DE_BARRE]: "COUP DE BARRE",
+};
 
 const CornerMarks = ({ label }: { label: string }) => (
   <>
@@ -129,12 +221,25 @@ const Face = ({ code, size }: { code: CardCode; size: CardSize }) => {
       ) : (
         <>
           {isNumberCard(code) && !tiny && <CornerMarks label={label} />}
-          <span
-            className="relative font-black italic leading-none tabular-nums drop-shadow-sm"
-            style={{ fontSize: dims.h * 0.42 * shrink }}
-          >
-            {label}
-          </span>
+          <div className="relative flex flex-col items-center leading-none">
+            <span
+              className="font-black italic tabular-nums drop-shadow-sm"
+              style={{ fontSize: dims.h * 0.42 * shrink }}
+            >
+              {label}
+            </span>
+            {/* A special number prints the value it scores as — you have to be
+                able to see the duplicate coming — so the word underneath is
+                what tells it apart from its plain twin. */}
+            {SPECIAL_LABEL[code] && !tiny && (
+              <span
+                className="mt-[0.12em] whitespace-nowrap font-black uppercase tracking-wide opacity-90"
+                style={{ fontSize: dims.h * 0.092 }}
+              >
+                {SPECIAL_LABEL[code]}
+              </span>
+            )}
+          </div>
         </>
       )}
     </div>

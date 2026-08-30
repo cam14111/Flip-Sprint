@@ -20,13 +20,15 @@ import {
   GameState,
   SECOND_WIND,
   WHISTLE,
+  RulesetId,
 } from "./types";
 
 /** Plays a whole AI-only game and returns the final state. */
 const playAiGame = (
   difficulties: Difficulty[],
   seed: number,
-  scoreLimit = 200
+  scoreLimit = 200,
+  ruleset: RulesetId = "classique"
 ): GameState => {
   // One engine-wide difficulty, so a mixed table is played one seat at a time
   // by swapping the field before each decision.
@@ -35,6 +37,7 @@ const playAiGame = (
     aiSeats: difficulties.map((_, i) => i),
     seed,
     scoreLimit,
+    ruleset,
   });
 
   for (let step = 0; step < 40_000; step++) {
@@ -50,7 +53,7 @@ const playAiGame = (
     if (next === state) {
       throw new Error(`AI played an illegal ${action.type} in ${state.phase}`);
     }
-    checkInvariants(next, DECK_SIZE.classique);
+    checkInvariants(next, DECK_SIZE[ruleset]);
     state = next;
   }
   throw new Error("AI game never finished");
@@ -331,4 +334,23 @@ describe("le Débutant se trompe visiblement", () => {
     expect(decideAction(beginner, [])).toEqual({ type: "hit" });
     expect(decideAction(pro, [])).toEqual({ type: "stay" });
   });
+});
+
+describe("l'IA sait jouer Coups bas", () => {
+  it("ne bloque jamais une partie, de 2 à 8 coureurs", () => {
+    // Le vrai risque : les nouvelles cartes demandent de POINTER une carte, pas
+    // seulement un coureur. Une IA qui ne saurait pas répondre en phase
+    // « picking » figerait la partie en solo, sans erreur ni message.
+    for (let players = 2; players <= 8; players++) {
+      for (const level of ["easy", "normal", "hard"] as Difficulty[]) {
+        const state = playAiGame(
+          Array.from({ length: players }, () => level),
+          players * 977 + level.length,
+          200,
+          "coupsbas"
+        );
+        expect(state.phase).toBe("gameOver");
+      }
+    }
+  }, 120_000);
 });

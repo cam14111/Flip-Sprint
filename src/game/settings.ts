@@ -1,7 +1,7 @@
 // User settings, persisted locally. No account, no server — one JSON blob in
 // localStorage, merged over the defaults so an older save never breaks.
 
-import { Difficulty, GameMode } from "./types";
+import { Difficulty, GameMode, RulesetId } from "./types";
 
 /** How a game is won. Named after how it feels, not after a number. */
 export type RaceMode = "sprint" | "eclair" | "marathon";
@@ -46,6 +46,10 @@ export interface Settings {
   localNames: string[];
   difficulty: Difficulty;
   raceMode: RaceMode;
+  /** Which rules to play under. */
+  ruleset: RulesetId;
+  /** Coups bas sub-option: race scores may go below zero. */
+  brutal: boolean;
   /** Seats to open when creating an online race (2-8). */
   onlinePlayers: number;
   sound: boolean;
@@ -64,6 +68,8 @@ export const DEFAULT_SETTINGS: Settings = {
   localNames: [],
   difficulty: "normal",
   raceMode: "sprint",
+  ruleset: "classique",
+  brutal: false,
   onlinePlayers: 4,
   sound: true,
   haptics: true,

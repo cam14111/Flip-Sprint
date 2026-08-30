@@ -8,10 +8,21 @@ import {
   BURST,
   bonusValue,
   CardCode,
+  COUP_DE_BARRE,
+  DOSSARD_FETICHE,
+  DRAFT,
+  FAUX_DEPART,
   isBonusCard,
   isNumberCard,
+  isPenaltyCard,
+  LAST_STRAIGHT,
+  LE_MUR,
+  penaltyValue,
+  RELAY,
   RunnerStatus,
   SECOND_WIND,
+  SQUALL,
+  STUMBLE,
   TURBO,
   WHISTLE,
 } from "./types";
@@ -21,19 +32,34 @@ export const TAGLINE = "Pousse ta chance jusqu'à la ligne d'arrivée.";
 
 /** Short name of a card, for badges and recaps. */
 export const cardName = (code: CardCode): string => {
+  // The three Coups bas specials ARE number cards, so they have to be named
+  // before the generic branch claims them and calls Le Mur "41".
+  if (code === FAUX_DEPART) return "Faux départ";
+  if (code === LE_MUR) return "Le Mur";
+  if (code === DOSSARD_FETICHE) return "Dossard fétiche";
   if (isNumberCard(code)) return String(code);
   if (isBonusCard(code)) return `+${bonusValue(code)}`;
   if (code === TURBO) return "×2";
   if (code === WHISTLE) return "Coup de sifflet";
   if (code === BURST) return "Rafale";
   if (code === SECOND_WIND) return "Second souffle";
+  if (code === COUP_DE_BARRE) return "Coup de barre";
+  if (isPenaltyCard(code)) return `−${penaltyValue(code)}`;
+  if (code === LAST_STRAIGHT) return "Dernière ligne droite";
+  if (code === SQUALL) return "Bourrasque";
+  if (code === RELAY) return "Relais";
+  if (code === DRAFT) return "Aspiration";
+  if (code === STUMBLE) return "Faux pas";
   return "?";
 };
 
 /** One-line explanation, used on the card back of the rules screen. */
 export const cardHelp = (code: CardCode): string => {
-  if (isNumberCard(code)) {
-    return "Un numéro que tu n'as pas encore : il s'ajoute à ton couloir.";
+  // Same ordering trap as `cardName`: the specials are number cards too.
+  if (code !== FAUX_DEPART && code !== LE_MUR && code !== DOSSARD_FETICHE) {
+    if (isNumberCard(code)) {
+      return "Un numéro que tu n'as pas encore : il s'ajoute à ton couloir.";
+    }
   }
   if (isBonusCard(code)) {
     return `${bonusValue(code)} points ajoutés à la fin, après le turbo.`;
@@ -47,7 +73,28 @@ export const cardHelp = (code: CardCode): string => {
       return "Le coureur visé doit prendre trois cartes d'affilée.";
     case SECOND_WIND:
       return "Annule un doublon. Une seule en main à la fois.";
+    case FAUX_DEPART:
+      return "Score nul pour la course, et interdiction de souffler — sauf Sprint parfait.";
+    case LE_MUR:
+      return "Vide le couloir de celui qui le reçoit. Il ne reste que lui.";
+    case DOSSARD_FETICHE:
+      return "Autorise un second 13. Les deux comptent vers le Sprint parfait.";
+    case COUP_DE_BARRE:
+      return "Divise la somme des numéros par deux, avant les pénalités.";
+    case LAST_STRAIGHT:
+      return "Le coureur visé prend une carte, puis doit souffler.";
+    case SQUALL:
+      return "Le coureur visé prend quatre cartes d'affilée.";
+    case RELAY:
+      return "Échange deux cartes entre deux couloirs.";
+    case DRAFT:
+      return "Prends une carte dans le couloir d'un rival.";
+    case STUMBLE:
+      return "Le coureur visé perd une carte de ton choix.";
     default:
+      if (isPenaltyCard(code)) {
+        return `${penaltyValue(code)} points retirés, après le Coup de barre.`;
+      }
       return "";
   }
 };
@@ -89,6 +136,18 @@ export const UI = {
   whistleOnMe: "Tu encaisses tes points et tu sors de la course.",
   burstOnMe: "Tu dois prendre trois cartes d'affilée.",
   incomingDismiss: "Touche pour continuer",
+
+  // --- Coups bas ------------------------------------------------------------
+  rulesetClassique: "Classique",
+  rulesetCoupsBas: "Coups bas",
+  coupsBasHint: "Tout est permis dans le peloton",
+  brutalLabel: "Nuit noire",
+  brutalHint: "Les scores peuvent passer sous zéro",
+  pickSteal: "Quelle carte lui prends-tu ?",
+  pickStumble: "Quelle carte lui fais-tu lâcher ?",
+  pickRelayFirst: "Première carte à échanger",
+  pickRelaySecond: "Contre laquelle ?",
+  pickHint: "Touche une carte",
   targetSelf: "Toi",
 
   // --- Race events --------------------------------------------------------

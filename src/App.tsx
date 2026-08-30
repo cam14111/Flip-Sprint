@@ -69,6 +69,8 @@ const gameOptions = (settings: Settings) => {
       difficulty: settings.difficulty,
       scoreLimit: spec.scoreLimit,
       roundLimit: spec.roundLimit,
+      ruleset: settings.ruleset,
+      brutal: settings.brutal,
     };
   }
 
@@ -82,6 +84,8 @@ const gameOptions = (settings: Settings) => {
     aiSeats: [],
     scoreLimit: spec.scoreLimit,
     roundLimit: spec.roundLimit,
+    ruleset: settings.ruleset,
+    brutal: settings.brutal,
   };
 };
 

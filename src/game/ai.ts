@@ -18,6 +18,8 @@
 // the benchmark in ai.test.ts be honest about their real win rates.
 
 import { deckComposition } from "./deck";
+import { canStay, legalCardPicks } from "./engine";
+import { cramps } from "./lane";
 import {
   hasNumber,
   hasTurbo,
@@ -29,15 +31,25 @@ import {
 import {
   bonusValue,
   BURST,
+  Card,
   CardCode,
+  COUP_DE_BARRE,
   Difficulty,
+  DOSSARD_FETICHE,
+  DRAFT,
+  FAUX_DEPART,
   GameAction,
   GameState,
   isBonusCard,
   isNumberCard,
+  isPenaltyCard,
+  LE_MUR,
+  numberValue,
+  penaltyValue,
   PERFECT_BONUS,
   PERFECT_COUNT,
   SECOND_WIND,
+  STUMBLE,
   TURBO,
 } from "./types";
 import { drawableCounts } from "./odds";
@@ -315,6 +327,8 @@ export const decideAction = (
     case "draw":
       return { type: "hit" };
     case "decide":
+      // The Faux départ takes the choice away from whoever holds it.
+      if (!canStay(state)) return { type: "hit" };
       return shouldHit(state, seat, policy) ? { type: "hit" } : { type: "stay" };
     case "targeting":
       if (legalTargets.length === 0) return null;
@@ -322,6 +336,10 @@ export const decideAction = (
         type: "assign",
         target: pickTarget(state, seat, legalTargets, policy),
       };
+    case "picking": {
+      const ref = pickCard(state, seat);
+      return ref === null ? null : { type: "pick", ref };
+    }
     default:
       return null;
   }
@@ -333,4 +351,71 @@ export const thinkingDelay = (state: GameState): number => {
     return runningSeats(state.players).length > 4 ? 380 : 520;
   }
   return state.phase === "targeting" ? 780 : 620;
+};
+
+// ---------------------------------------------------------------------------
+// Coups bas: which card to point at
+// ---------------------------------------------------------------------------
+
+/** What a single card is worth to the runner holding it, roughly. */
+const cardWorth = (state: GameState, seat: number, card: Card): number => {
+  const value = numberValue(card.code);
+  if (value !== null) {
+    // A number is worth its face — but the Faux départ is a millstone and Le
+    // Mur is a bomb, so their holder is better off without them.
+    if (card.code === FAUX_DEPART) return -25;
+    if (card.code === LE_MUR) return -15;
+    if (card.code === DOSSARD_FETICHE) return value + 6;
+    return value;
+  }
+  if (card.code === COUP_DE_BARRE) return -laneScore(state.players[seat]) / 2;
+  if (isPenaltyCard(card.code)) return -penaltyValue(card.code);
+  return 0;
+};
+
+/**
+ * Points at a card, for an Aspiration, a Faux pas or a Relais.
+ *
+ * The same yardstick serves all three: what a card is worth to whoever holds
+ * it. Stealing takes the most valuable thing a rival owns — unless it would
+ * cramp us, which is exactly the trap these cards set. Making somebody drop a
+ * card takes their best. A Relais gives away our worst for their best.
+ */
+const pickCard = (state: GameState, seat: number): string | null => {
+  const pending = state.pendingAssign;
+  if (!pending) return null;
+  const picks = legalCardPicks(state);
+  if (picks.length === 0) return null;
+
+  const find = (ref: string): { seat: number; card: Card } | null => {
+    for (let s = 0; s < state.players.length; s++) {
+      const card = state.players[s].lane.find((c) => c.id === ref);
+      if (card) return { seat: s, card };
+    }
+    return null;
+  };
+
+  const score = (ref: string): number => {
+    const found = find(ref);
+    if (!found) return -Infinity;
+    const worth = cardWorth(state, found.seat, found.card);
+
+    if (pending.card.code === DRAFT) {
+      // Taking a number we already hold would cramp us: that is a loss, not a
+      // gain, however juicy the card looks.
+      if (cramps(state.players[seat], found.card)) return -100;
+      return worth;
+    }
+    if (pending.card.code === STUMBLE) return worth;
+
+    // Relais: first the card we least want, then the best one on offer.
+    if (pending.firstRef === undefined) {
+      return found.seat === seat ? -worth + 30 : -worth;
+    }
+    const first = find(pending.firstRef);
+    const mine = first?.seat === seat;
+    return mine ? worth : -worth;
+  };
+
+  return picks.reduce((best, ref) => (score(ref) > score(best) ? ref : best));
 };
