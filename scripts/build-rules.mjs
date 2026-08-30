@@ -117,6 +117,17 @@ const actionValidate = [
         `newData.child('target').isString() && ` +
         `newData.child('target').val().matches(/^[0-7]$/))`,
 
+      // Coups bas — point at a card in a lane. The database holds the action
+      // log and nothing else: it has never seen a lane, so it cannot check
+      // that the named card is really there. What it CAN hold is who is
+      // allowed to speak and when, which is what this line does. The rest is
+      // caught by every other device's replay, which marks the game corrupted
+      // rather than accepting a forged move. Same trade, already documented,
+      // as the client that shuffles the deck.
+      `(${newType} === 'pick' && ${playedByActor} && ${phaseIs("picking")} && ` +
+        `newData.child('ref').isString() && ` +
+        `newData.child('ref').val().length <= 12)`,
+
       // Leave: written by that player, or by someone else once they qualify.
       `(${newType} === 'forfeit' && (${game("/seats/' + " + newSeat + " + '/uid")}.val() === auth.uid || ` +
         `${hasLeft(newSeat)} || ${isAbsent(newSeat)}))`,
@@ -162,7 +173,11 @@ const rules = {
             "newData.child('maxPlayers').isNumber() && " +
             "newData.child('maxPlayers').val() >= 2 && " +
             "newData.child('maxPlayers').val() <= 8 && " +
-            "newData.child('scoreLimit').isNumber()",
+            "newData.child('scoreLimit').isNumber() && " +
+            // The deck follows from the ruleset, so it cannot change once a
+            // card has been dealt. Absent means the original rules.
+            "(!newData.child('ruleset').exists() || " +
+            "newData.child('ruleset').val().matches(/^(classique|coupsbas)$/))",
         },
 
         seats: {
@@ -219,7 +234,7 @@ const rules = {
             "newData.child('actor').isString() && " +
             "newData.child('actor').val().matches(/^[0-7]$/) && " +
             "newData.child('cursorRef').isString() && " +
-            "newData.child('phase').val().matches(/^(draw|decide|targeting|settling)$/) && " +
+            "newData.child('phase').val().matches(/^(draw|decide|targeting|picking|settling)$/) && " +
             // A seat that is not playing can never be handed the initiative.
             `(!${game("/start")}.exists() || ` +
             `newData.child('actor').val() < ${game("/start/count")}.val() + '')`,

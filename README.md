@@ -32,13 +32,55 @@ numéros rapportent le plus et sont ceux qui cramponnent le plus souvent.
 
 **Formats** : Éclair (5 courses), Sprint (200 points), Marathon (300 points).
 
+## Coups bas — la variante
+
+Un second jeu de règles complet, choisi avant la partie et figé pour toute sa
+durée. Ce n'est pas le paquet classique avec quelques cartes en plus : le
+paquet, la détection des doublons, le calcul des scores et la liste des
+coureurs qu'on peut viser changent tous.
+
+**108 cartes** : 92 numéros de 0 à 13 (jusqu'à **treize `13`**), 6 pénalités à
+la place des bonus et du turbo, 10 cartes action. Ni Second souffle, ni Coup de
+sifflet, ni Rafale.
+
+| Carte | Ce que ça fait |
+|---|---|
+| **Faux départ** | Le seul `0`. Score nul pour la course — sauf Sprint parfait — et interdiction de souffler |
+| **Le Mur** | Un `7` qui vide le couloir de celui qui le reçoit. Il ne reste que lui |
+| **Dossard fétiche** | Un `13` qui en autorise un second. Les deux comptent vers le Sprint parfait |
+| **Pénalités −2 à −10** | Données au coureur de ton choix, retirées à la fin |
+| **Coup de barre (÷2)** | Divise la somme des numéros par deux, **avant** les pénalités |
+| **Dernière ligne droite** | La cible prend une carte, puis doit souffler |
+| **Bourrasque** | La cible prend quatre cartes d'affilée |
+| **Relais** | Échange deux cartes entre deux couloirs |
+| **Aspiration** | Tu prends une carte dans le couloir d'un rival |
+| **Faux pas** | La cible perd une carte de ton choix |
+
+Deux règles changent la façon de jouer plus que les cartes elles-mêmes :
+
+- **Souffler ne met plus à l'abri.** Un coureur qui s'est arrêté garde ses
+  cartes sur la table : il reste ciblable, peut recevoir une pénalité, se faire
+  voler une carte — et **cramper après coup**. Seul un couloir crampé est hors
+  de portée.
+- **Le Relais est atomique.** On échange, *puis* on juge les deux couloirs :
+  un seul Relais peut faire cramper les deux coureurs à la fois.
+
+**Nuit noire** est une sous-option de Coups bas : les scores de course peuvent
+passer sous zéro, et une pénalité peut être collée à un couloir déjà crampé.
+
+> Les mécaniques de jeu ne sont pas protégeables ; les noms et les visuels le
+> sont. Comme pour le reste de Flip Sprint, cette variante n'emprunte que des
+> règles : le nom, celui de chaque carte, les textes et les dessins sont
+> originaux.
+
 ## Fonctionnalités
 
 - **Moteur de jeu pur et testé** (`src/game/`) : toutes les règles vivent dans
   un réducteur pur, sans React, sans timer et sans hasard ambiant. Couvert par
-  94 tests, dont 1050 parties aléatoires de 2 à 8 coureurs qui vérifient à
-  chaque transition la conservation des 94 cartes, l'absence de doublon dans un
-  couloir, la terminaison et le déterminisme.
+  134 tests, dont plus de 1400 parties aléatoires de 2 à 8 coureurs — sous les
+  deux jeux de règles — qui vérifient à chaque transition la conservation des
+  cartes, l'absence de doublon dans un couloir, la terminaison et le
+  déterminisme.
 - **Jauge de risque** : toutes les cartes étant retournées face visible, la
   probabilité de crampe affichée avant chaque décision est **exacte**, pas une
   heuristique — et l'IA raisonne sur exactement le même calcul.
@@ -76,7 +118,8 @@ database.rules.json   règles de sécurité RTDB (généré, voir plus bas)
 Les **cartes sont dessinées en CSS** (`src/ui/Card.tsx`, couleurs dans
 `src/ui/theme.ts`) : aucune image n'est chargée, le rendu est net à toutes les
 tailles et le poids hors-ligne est quasi nul. Les numéros sont colorés par le
-**risque** — bleu calme (0-4), ambre (5-8), magenta incandescent (9-12).
+**risque** — bleu calme (0-4), ambre (5-8), magenta (9-12), et rouge
+incandescent pour le `13` de Coups bas.
 
 ### Le piège de l'encoche
 
@@ -122,7 +165,18 @@ vérifient qu'elle correspond au secret.
   client ne peut lire **qu'une seule carte à la fois** : celle que son propre
   marqueur désigne, et seulement pendant qu'il est l'acteur ;
 - un coureur ne peut être exclu qu'après **60 secondes d'absence réelle**, ou
-  après avoir signé lui-même son départ.
+  après avoir signé lui-même son départ ;
+- le **jeu de règles est figé** dans le salon : le paquet en découle, il ne peut
+  donc pas changer une fois une carte distribuée.
+
+Une limite à connaître sur la variante Coups bas : ses cartes désignent une
+carte précise dans un couloir, or la base ne stocke **que le journal d'actions**
+— elle n'a jamais vu un couloir. Elle vérifie donc qui parle et à quel moment,
+mais pas que la carte désignée s'y trouve vraiment. Cette légalité-là est
+attrapée par le rejeu de chaque appareil, qui marque la partie corrompue plutôt
+que de l'accepter : un coup forgé est **détecté partout, pas silencieusement
+exploitable**. C'est le même compromis que le client qui mélange le paquet,
+décrit juste en dessous.
 
 `npm run test:rules` lance **34 sondes** contre l'émulateur, avec ces règles et
 de vraies identités de joueurs — chacune correspond à une attaque qu'un client
@@ -204,13 +258,14 @@ npm run dev            # http://localhost:8080
 ### Vérifier
 
 ```sh
-npm test               # moteur, IA, rejeu — 94 tests
+npm test               # moteur, IA, rejeu — 134 tests
 npm run lint
 npm run build          # typecheck + build de production
 npm run smoke          # joue une partie locale entière dans un vrai navigateur
+npm run smoke:coupsbas # la même chose sous les règles Coups bas
 npm run check:notch    # la zone derrière l'encoche se raccorde-t-elle au plateau ?
 npm run check:alerts   # l'annonce d'une carte subie se referme-t-elle seule ?
-npm run test:rules     # 34 sondes de sécurité contre l'émulateur
+npm run test:rules     # sondes de sécurité contre l'émulateur
 npm run e2e:online     # deux navigateurs, une vraie course en ligne (14 vérifs)
 ```
 

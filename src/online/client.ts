@@ -30,7 +30,7 @@ import {
   set,
   update,
 } from "firebase/database";
-import { GameAction, GameState } from "@/game/types";
+import { GameAction, GameState, RulesetId } from "@/game/types";
 import { activeCount, activeSeats, leaders } from "@/game/scoring";
 import { generateDeal } from "./dealer";
 import { ensureSignedIn } from "./firebase";
@@ -98,6 +98,9 @@ export interface OnlineSnapshot {
   mySeat: Seat;
   /** Seats the host opened. */
   maxPlayers: number;
+  /** The rules the host chose. Every device plays what the lobby says. */
+  ruleset: RulesetId;
+  brutal: boolean;
   /** Seats actually playing (0 while the lobby is still filling). */
   playerCount: number;
   isHost: boolean;
@@ -205,7 +208,9 @@ export class OnlineGame {
     name: string,
     scoreLimit: number,
     roundLimit: number | null,
-    maxPlayers: number
+    maxPlayers: number,
+    ruleset: RulesetId = "classique",
+    brutal = false
   ): Promise<OnlineGame> {
     const players = Math.max(MIN_PLAYERS, Math.min(MAX_PLAYERS, maxPlayers));
     const { uid, db } = await ensureSignedIn();
@@ -213,7 +218,7 @@ export class OnlineGame {
 
     for (let attempt = 0; attempt < 4; attempt++) {
       const code = randomGameCode();
-      const deal = generateDeal();
+      const deal = generateDeal(ruleset);
       const payload: Record<string, unknown> = {
         [P.game(code)]: {
           lobby: {
@@ -221,6 +226,10 @@ export class OnlineGame {
             scoreLimit,
             roundLimit,
             maxPlayers: players,
+            // Frozen for the whole game: the deck differs, so it can never
+            // change once a card has been dealt.
+            ruleset,
+            brutal: ruleset === "coupsbas" && brutal,
             createdAt: serverTimestamp(),
           },
           seats: { 0: { uid, name } },
@@ -458,6 +467,10 @@ export class OnlineGame {
       ),
       scoreLimit: this.lobby?.scoreLimit ?? 200,
       roundLimit: this.lobby?.roundLimit ?? null,
+      // A lobby created before Coups bas existed carries neither field, and
+      // was played under the original rules.
+      ruleset: this.lobby?.ruleset ?? "classique",
+      brutal: this.lobby?.brutal ?? false,
       playerCount: count,
     };
   }
@@ -522,6 +535,8 @@ export class OnlineGame {
       code: this.code,
       mySeat: this.mySeat,
       maxPlayers: this.maxPlayers,
+      ruleset: this.lobby?.ruleset ?? "classique",
+      brutal: this.lobby?.brutal ?? false,
       playerCount: this.playerCount,
       isHost: this.mySeat === 0,
       started: this.start !== null,
@@ -611,6 +626,10 @@ export class OnlineGame {
         return { seat, type: "stay" };
       case "assign":
         return { seat, type: "assign", target: action.target };
+      case "pick":
+        // The card is face up in a lane already, so its ref carries no secret
+        // and needs no peek marker.
+        return { seat, type: "pick", ref: action.ref };
       default:
         return null;
     }
@@ -765,7 +784,9 @@ export class OnlineGame {
   private async dealNextCourse(next: number): Promise<void> {
     const key = courseKey(next);
     if (this.courses.get(key)?.dealt) return; // already dealt
-    const deal = generateDeal();
+    // Every course of a game is dealt from the same deck as the first: the
+    // ruleset was frozen in the lobby.
+    const deal = generateDeal(this.lobby?.ruleset ?? "classique");
     const replay = this.replay;
     if (!replay) return;
 

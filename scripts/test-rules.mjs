@@ -81,7 +81,7 @@ const makeClient = async (name) => {
 };
 
 /** A freshly created race with `hostClient` in seat 0. */
-const createRace = async (host, code, maxPlayers = 3) => {
+const createRace = async (host, code, maxPlayers = 3, overrides = {}) => {
   const secrets = {};
   // A known deck, so the probes can predict what a legal move looks like.
   for (let i = 0; i < 94; i++) secrets[i] = (i % 12) + 1;
@@ -103,6 +103,7 @@ const createRace = async (host, code, maxPlayers = 3) => {
         phase: "draw",
         cursorRef: "d/0",
         nextCourse: "c2",
+        ...overrides,
       },
       courses: { c1: { deal: { at: serverTimestamp() } } },
     },
@@ -369,6 +370,78 @@ const main = async () => {
     );
 
     // ---------------------------------------------------------------------
+    // Coups bas adds an action that points at a card already face up in a
+    // lane. The database has never seen a lane, so it cannot check that the
+    // card is really there — that is caught by every other device's replay.
+    // What it CAN hold is who may speak, and when.
+    console.log("\nCoups bas — l'action « pick »");
+    const cb = "DDDDDD";
+    await createRace(alice, cb, 3, { phase: "picking" });
+    await set(ref(bob.db, `games/${cb}/seats/1`), { uid: bob.uid, name: "bob" });
+
+    check(
+      await allowed(() =>
+        set(ref(alice.db, `games/${cb}/courses/c1/actions/a0000`), {
+          seat: "0",
+          type: "pick",
+          ref: "d/3",
+        })
+      ),
+      "l'acteur peut désigner une carte pendant la phase de sélection"
+    );
+
+    check(
+      await denied(() =>
+        set(ref(bob.db, `games/${cb}/courses/c1/actions/a0001`), {
+          seat: "1",
+          type: "pick",
+          ref: "d/4",
+        })
+      ),
+      "un joueur qui n'est pas l'acteur ne peut désigner aucune carte"
+    );
+
+    const other2 = "EEEEEE";
+    await createRace(alice, other2, 3);
+    check(
+      await denied(() =>
+        set(ref(alice.db, `games/${other2}/courses/c1/actions/a0000`), {
+          seat: "0",
+          type: "pick",
+          ref: "d/1",
+        })
+      ),
+      "désigner une carte hors de la phase de sélection est refusé"
+    );
+
+    // ---------------------------------------------------------------------
+    console.log("\nle jeu de règles est figé");
+    check(
+      await denied(() =>
+        set(ref(alice.db, `games/${other2}/lobby/ruleset`), "coupsbas")
+      ),
+      "changer les règles d'une partie en cours est refusé"
+    );
+    check(
+      await denied(() =>
+        update(ref(alice.db), {
+          [`games/FFFFFF`]: {
+            lobby: {
+              hostName: "alice",
+              scoreLimit: 200,
+              roundLimit: null,
+              maxPlayers: 2,
+              ruleset: "triche",
+              createdAt: serverTimestamp(),
+            },
+            seats: { 0: { uid: alice.uid, name: "alice" } },
+          },
+        })
+      ),
+      "un jeu de règles inventé est refusé à la création"
+    );
+
+    // ---------------------------------------------------------------------
     // Realtime Database rules CASCADE: a `.write` granted on a parent grants
     // it on every descendant, whatever their own rules say. A blanket grant
     // high in the secrets tree would therefore let a seated player rewrite a
@@ -425,3 +498,7 @@ const main = async () => {
 };
 
 await main();
+// The emulator keeps a handle open that `stop()` does not always release, and
+// a probe suite that never returns is a probe suite nobody runs. Every check
+// has reported by this point, so leaving is safe.
+process.exit(0);

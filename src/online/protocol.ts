@@ -19,6 +19,8 @@
 // concatenate strings. TypeScript keeps seats as numbers and converts at the
 // read/write boundary.
 
+import { RulesetId } from "@/game/types";
+
 export type Seat = number;
 
 export const MIN_PLAYERS = 2;
@@ -84,6 +86,7 @@ export type OnlineActionType =
   | "hit" // take the next card and turn it over
   | "stay" // catch your breath, bank the lane
   | "assign" // hand out the action card just drawn
+  | "pick" // point at a card in a lane (Coups bas)
   | "forfeit"; // leave the game (voluntarily, or excluded while absent)
 
 export interface OnlineAction {
@@ -95,7 +98,11 @@ export interface OnlineAction {
    */
   seat: Seat;
   type: OnlineActionType;
-  /** Secret ref this action makes public — the card being taken. */
+  /**
+   * For "hit": the secret ref this action makes public — the card being taken.
+   * For "pick": the card being pointed at, named by the id it was dealt under.
+   * That card is already face up in a lane, so naming it reveals no secret.
+   */
   ref?: string;
   /** The revealed card code (must equal the secret at `ref`). */
   value?: number;
@@ -158,6 +165,13 @@ export interface LobbyInfo {
   roundLimit: number | null;
   /** Seats the host opened (2..8). */
   maxPlayers: number;
+  /**
+   * Which rules the host chose. Absent on a lobby created before Coups bas
+   * existed, which is exactly the original deck.
+   */
+  ruleset?: RulesetId;
+  /** Coups bas sub-option "Nuit noire". */
+  brutal?: boolean;
   createdAt: number | object;
 }
 

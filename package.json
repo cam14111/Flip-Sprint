@@ -13,6 +13,7 @@
     "generate:icons": "node scripts/generate-icons.mjs",
     "e2e:online": "node scripts/e2e-online.mjs",
     "e2e:online:fast": "node scripts/e2e-online.mjs --fast",
+    "e2e:online:coupsbas": "node scripts/e2e-online.mjs --coups-bas",
     "smoke": "node scripts/smoke-local.mjs",
     "smoke:coupsbas": "node scripts/smoke-local.mjs --coups-bas",
     "check:notch": "node scripts/check-notch.mjs",

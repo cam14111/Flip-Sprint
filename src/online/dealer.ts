@@ -11,16 +11,16 @@
 // and its one caller change.
 
 import { dealDeck, randomSeed } from "@/game/deck";
-import { CardCode } from "@/game/types";
+import { CardCode, RulesetId } from "@/game/types";
 
 export interface Deal {
   /** The `secrets/{code}/{course}` payload: { d: { 0: code, 1: code, … } }. */
   secrets: { d: Record<number, CardCode> };
 }
 
-/** Shuffles a fresh 94-card deck into the order a course will be dealt in. */
-export const generateDeal = (): Deal => {
-  const { cards } = dealDeck(randomSeed());
+/** Shuffles a fresh deck into the order a course will be dealt in. */
+export const generateDeal = (ruleset: RulesetId = "classique"): Deal => {
+  const { cards } = dealDeck(randomSeed(), ruleset);
   const d: Record<number, CardCode> = {};
   cards.forEach((card, index) => {
     d[index] = card.code;

@@ -18,6 +18,9 @@ import { chromium } from "playwright";
 import { emulatorEnv, startEmulators, waitForHttp } from "./emulators.mjs";
 
 const LIVE = process.argv.includes("--live");
+// `--coups-bas` runs the whole race under the variant's rules: a different
+// deck, a different wire action, and a different set of database rules.
+const COUPS_BAS = process.argv.includes("--coups-bas");
 const VITE_PORT = 8123;
 const BASE = `http://127.0.0.1:${VITE_PORT}/`;
 
@@ -115,7 +118,7 @@ const main = async () => {
     const guest = await openPhone("invité", GUEST_NAME);
 
     // ---- Create -----------------------------------------------------------
-    console.log("\ncréation du salon");
+    console.log(`\ncréation du salon (${COUPS_BAS ? "Coups bas" : "classique"})`);
     await host.page.goto(BASE, { waitUntil: "networkidle" });
     await host.page.evaluate(() => localStorage.clear());
     await host.page.reload({ waitUntil: "networkidle" });
@@ -123,6 +126,9 @@ const main = async () => {
     // — left to the default, both runners would be called "Toi".
     await host.page.getByPlaceholder("Toi").fill(HOST_NAME);
     await host.page.getByRole("button", { name: "En ligne" }).click();
+    if (COUPS_BAS) {
+      await host.page.getByRole("button", { name: "Coups bas", exact: true }).click();
+    }
     await host.page.getByRole("button", { name: /Jouer/ }).click();
 
     // Two seats, so the race starts as soon as the guest sits down.
@@ -200,8 +206,11 @@ const main = async () => {
     // names its runner in its aria-label, under either of the two wordings it
     // takes (plain, or offered as a target).
     const bottomName = async (page) => {
+      // Lanes only. A card offered for a Relais or an Aspiration answers to
+      // "Choisir" too, but it is a plain <button> — a lane carries the role
+      // attribute explicitly, which is what tells the two apart here.
       const labels = await page
-        .locator('[aria-label^="Couloir de "], [aria-label^="Choisir "]')
+        .locator('[aria-label^="Couloir de "], [role="button"][aria-label^="Choisir "]')
         .evaluateAll((nodes) =>
           nodes.map((n) => n.getAttribute("aria-label") ?? "")
         );
@@ -223,9 +232,7 @@ const main = async () => {
     /** Plays whichever phone currently has the initiative. */
     const playOneMove = async () => {
       for (const phone of phones) {
-        const target = phone.page
-          .locator('[role="button"][aria-label^="Choisir"]')
-          .first();
+        const target = phone.page.locator('[aria-label^="Choisir"]').first();
         if (await target.count()) {
           await target.click();
           return true;

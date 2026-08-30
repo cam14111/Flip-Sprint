@@ -9,7 +9,12 @@
 // is totally ordered with the moves around it and every device applies it at
 // the same position.
 
-import { forfeitRunner, legalTargets, reduce } from "@/game/engine";
+import {
+  forfeitRunner,
+  legalCardPicks,
+  legalTargets,
+  reduce,
+} from "@/game/engine";
 import { DECK_SIZE } from "@/game/deck";
 import {
   Card,
@@ -165,6 +170,16 @@ const applyAction = (state: GameState, action: OnlineAction): GameState | null =
     if (action.target === undefined) return null;
     if (!legalTargets(working).includes(action.target)) return null;
     const next = reduce(working, { type: "assign", target: action.target });
+    return next === working ? null : next;
+  }
+
+  if (action.type === "pick") {
+    // The card is already face up in a lane, so the log names it and every
+    // device resolves the same move. Legality is checked here rather than in
+    // the database, which never sees a lane at all.
+    if (action.ref === undefined) return null;
+    if (!legalCardPicks(working).includes(action.ref)) return null;
+    const next = reduce(working, { type: "pick", ref: action.ref });
     return next === working ? null : next;
   }
 

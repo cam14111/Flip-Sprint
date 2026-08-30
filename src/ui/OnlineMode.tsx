@@ -258,7 +258,14 @@ export const OnlineMode = ({
             size="lg"
             className="w-full"
             onClick={() =>
-              online.create(me, spec.scoreLimit, spec.roundLimit, settings.onlinePlayers)
+              online.create(
+                me,
+                spec.scoreLimit,
+                spec.roundLimit,
+                settings.onlinePlayers,
+                settings.ruleset,
+                settings.brutal
+              )
             }
           >
             Créer une partie
@@ -318,6 +325,17 @@ export const OnlineMode = ({
             <SeatRow key={i} index={i} player={snap.players[i] ?? null} />
           ))}
         </div>
+
+        {/* The host picks the rules; everyone else has to be told which ones
+            they just joined, before the first card is dealt. */}
+        {snap.ruleset === "coupsbas" && (
+          <p className="mt-4 text-center text-[12px]">
+            <span className="rounded-full bg-rose-500/15 px-2.5 py-1 font-bold text-rose-200 ring-1 ring-rose-400/40">
+              {UI.rulesetCoupsBas}
+              {snap.brutal && ` · ${UI.brutalLabel}`}
+            </span>
+          </p>
+        )}
 
         <p className="mt-4 text-center text-[12px] text-white/40">
           La course démarre dès que tout le monde est là.

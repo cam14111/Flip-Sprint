@@ -8,7 +8,7 @@
 // first use, so solo and local play — and the offline PWA — never pay for it.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { GameAction } from "@/game/types";
+import { GameAction, RulesetId } from "@/game/types";
 import type {
   OnlineErrorCode,
   OnlineGame,
@@ -30,7 +30,9 @@ export interface UseOnlineGame {
     name: string,
     scoreLimit: number,
     roundLimit: number | null,
-    seats: number
+    seats: number,
+    ruleset?: RulesetId,
+    brutal?: boolean
   ) => Promise<void>;
   join: (code: string, name: string) => Promise<void>;
   resume: (session: OnlineSession) => Promise<void>;
@@ -113,11 +115,20 @@ export const useOnlineGame = (): UseOnlineGame => {
       name: string,
       scoreLimit: number,
       roundLimit: number | null,
-      seats: number
+      seats: number,
+      ruleset: RulesetId = "classique",
+      brutal = false
     ) => {
       await guard("Création de la partie…", async () => {
         const { OnlineGame } = await loadClient();
-        return OnlineGame.create(name, scoreLimit, roundLimit, seats);
+        return OnlineGame.create(
+          name,
+          scoreLimit,
+          roundLimit,
+          seats,
+          ruleset,
+          brutal
+        );
       });
     },
     [guard]
