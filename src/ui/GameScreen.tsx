@@ -392,15 +392,18 @@ export const GameScreen = ({
           >
             En attente de <span className="text-white/80">{waitingFor}</span>…
           </p>
-        ) : targeting ? (
+        ) : targeting || picking ? (
+          // Only ever an instruction when it IS your move: telling somebody to
+          // touch a card while an AI is deciding invites a tap that does
+          // nothing, which reads as the game being broken.
           <p className="py-2 text-center text-xs text-white/45">
-            {game.phase === "bounty"
-              ? UI.bountyHint
-              : "Touche un couloir pour choisir"}
-          </p>
-        ) : picking ? (
-          <p className="py-2 text-center text-xs text-white/45">
-            {UI.pickHint}
+            {!interactive
+              ? UI.waitingOnActor(actor.name)
+              : picking
+                ? UI.pickHint
+                : game.phase === "bounty"
+                  ? UI.bountyHint
+                  : "Touche un couloir pour choisir"}
           </p>
         ) : (
           <div className="flex gap-2">

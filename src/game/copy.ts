@@ -151,6 +151,7 @@ export const UI = {
   pickRelayFirst: "Première carte à échanger",
   pickRelaySecond: "Contre laquelle ?",
   pickHint: "Touche une carte",
+  waitingOnActor: (name: string) => `${name} réfléchit…`,
   bountyPrompt: "Sprint parfait ! +15 pour toi, ou −15 pour un rival ?",
   bountyHint: "Touche ton couloir pour encaisser, ou celui d'un rival",
   bountyOther: (name: string) => `${name} décide de son Sprint parfait`,

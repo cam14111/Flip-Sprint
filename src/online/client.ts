@@ -658,9 +658,15 @@ export class OnlineGame {
       // While a race settles (scores, next deal) the writer keeps the pen: it
       // is the seat responsible for the upkeep writes that follow.
       actor: settled ? wireSeat(this.mySeat) : wireSeat(predicted.state.actor),
-      phase: settled
-        ? "settling"
-        : (predicted.state.phase as PublicState["phase"]),
+      // Written out rather than reusing `settled`: the type narrowing has to
+      // reach this expression, and that is the whole point of the change —
+      // the compiler now guarantees the wire never carries a phase the
+      // database rules have not been told about.
+      phase:
+        predicted.state.phase === "roundOver" ||
+        predicted.state.phase === "gameOver"
+          ? "settling"
+          : predicted.state.phase,
       cursorRef: predicted.cursorRef,
       nextCourse: courseKey(courseNumber(course) + 1),
     };

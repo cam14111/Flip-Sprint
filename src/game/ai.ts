@@ -314,6 +314,20 @@ const pickTarget = (
 // ---------------------------------------------------------------------------
 
 /** The move this AI runner makes, given whatever the board is asking of it. */
+/**
+ * Whether the board is waiting on an AI runner.
+ *
+ * Named and exported so it can be pinned down by a test, because getting it
+ * wrong is silent and total: the table simply stops, with no error and no way
+ * for the player to act. It is written as "not finished" rather than as a list
+ * of playable phases for the same reason — an allow-list froze the game the day
+ * Coups bas added two phases to it.
+ */
+export const aiMustAct = (state: GameState): boolean =>
+  state.players[state.actor]?.isAI === true &&
+  state.phase !== "roundOver" &&
+  state.phase !== "gameOver";
+
 export const decideAction = (
   state: GameState,
   legalTargets: number[]

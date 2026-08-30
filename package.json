@@ -16,6 +16,7 @@
     "e2e:online:coupsbas": "node scripts/e2e-online.mjs --coups-bas",
     "smoke": "node scripts/smoke-local.mjs",
     "smoke:coupsbas": "node scripts/smoke-local.mjs --coups-bas",
+    "smoke:solo": "node scripts/smoke-local.mjs --solo --coups-bas",
     "check:notch": "node scripts/check-notch.mjs",
     "check:alerts": "node scripts/check-alerts.mjs",
     "build:rules": "node scripts/build-rules.mjs",

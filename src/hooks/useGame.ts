@@ -4,7 +4,7 @@
 // effect lives here — sounds, vibrations, saving the game, recording stats.
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { decideAction, thinkingDelay } from "@/game/ai";
+import { aiMustAct, decideAction, thinkingDelay } from "@/game/ai";
 import {
   createGame,
   CreateGameOptions,
@@ -138,13 +138,7 @@ export const useGame = (
   // timer so it is watchable. The identity check inside setGame throws the
   // decision away if the board moved on in the meantime — which is what makes
   // it safe under StrictMode's double-invoked effects.
-  const actor = game.players[game.actor];
-  const aiTurn =
-    !paused &&
-    !!actor?.isAI &&
-    (game.phase === "draw" ||
-      game.phase === "decide" ||
-      game.phase === "targeting");
+  const aiTurn = !paused && aiMustAct(game);
 
   useEffect(() => {
     if (!aiTurn) return;

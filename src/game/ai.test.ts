@@ -2,7 +2,7 @@
 // only worth having if the levels actually beat each other.
 
 import { describe, expect, it } from "vitest";
-import { decideAction, evaluateHit } from "./ai";
+import { aiMustAct, decideAction, evaluateHit } from "./ai";
 import { DECK_SIZE } from "./deck";
 import {
   createGame,
@@ -15,6 +15,7 @@ import { laneScore } from "./scoring";
 import { checkInvariants, stackedGame } from "./test-utils";
 import {
   BURST,
+  ALL_PHASES,
   Card,
   Difficulty,
   GameState,
@@ -353,4 +354,33 @@ describe("l'IA sait jouer Coups bas", () => {
       }
     }
   }, 120_000);
+});
+
+describe("l'IA est sollicitée à chaque phase où elle doit agir", () => {
+  // Ce test existe à cause d'un bug signalé en jeu : le pilote de l'IA ne se
+  // déclenchait que sur trois phases nommées une à une, si bien que les deux
+  // phases ajoutées par Coups bas figeaient la table. Rien ne le disait —
+  // l'écran demandait « Touche une carte » et aucune touche n'avait d'effet.
+  //
+  // Le piège n'est pas dans la décision de l'IA, qui était juste, mais dans le
+  // fait de ne jamais la lui demander. C'est donc cela qu'on épingle.
+  const playable = ALL_PHASES.filter(
+    (phase) => phase !== "roundOver" && phase !== "gameOver"
+  );
+
+  it.each(playable)("réclame un coup en phase « %s »", (phase) => {
+    const base = createGame({ names: ["IA", "B"], aiSeats: [0] });
+    expect(aiMustAct({ ...base, phase })).toBe(true);
+  });
+
+  it("ne réclame rien une fois la course ou la partie terminée", () => {
+    const base = createGame({ names: ["IA", "B"], aiSeats: [0] });
+    expect(aiMustAct({ ...base, phase: "roundOver" })).toBe(false);
+    expect(aiMustAct({ ...base, phase: "gameOver" })).toBe(false);
+  });
+
+  it("ni quand c'est à un humain de jouer", () => {
+    const base = createGame({ names: ["Humain", "B"], aiSeats: [1] });
+    expect(aiMustAct({ ...base, phase: "picking" })).toBe(false);
+  });
 });

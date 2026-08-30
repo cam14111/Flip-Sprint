@@ -17,6 +17,15 @@ const MAX_STEPS = 600;
 // `--coups-bas` plays the same whole game under the variant's rules, which is
 // the only way to exercise the cards that make you POINT at another card.
 const COUPS_BAS = process.argv.includes("--coups-bas");
+// `--solo` plays against the AI instead of round a table. It looks like a
+// weaker test — most of the run is spent waiting — but it is the only one that
+// drives the AI through the REAL hook rather than calling its decision
+// function directly, and a table where the AI never acts is a table that
+// simply stops.
+const SOLO = process.argv.includes("--solo");
+// Nothing playable for this long means nobody is going to act: the AI thinks
+// for well under a second, so twelve of them is a freeze, not a pause.
+const STALL_POLLS = 60;
 
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium",
@@ -35,7 +44,20 @@ await page.goto(BASE, { waitUntil: "networkidle" });
 await page.evaluate(() => localStorage.clear());
 await page.reload({ waitUntil: "networkidle" });
 
-await page.getByRole("button", { name: "À plusieurs" }).click();
+await page
+  .getByRole("button", { name: SOLO ? "Solo" : "À plusieurs", exact: SOLO })
+  .click();
+if (SOLO) {
+  // Two rivals, so the AI draws enough cards for the awkward ones to come up.
+  // This run is slow — every AI move costs a thinking delay — and it is a
+  // coverage net, not the guard: whether the AI is ASKED to act at all is
+  // pinned down deterministically in `ai.test.ts`.
+  await page.getByRole("button", { name: "2", exact: true }).first().click();
+  // And a bounded format. Every AI move costs a thinking delay, so a run to
+  // 200 points takes ten minutes of wall clock for no extra coverage: five
+  // races exercise the same cards.
+  await page.getByRole("button", { name: "Éclair", exact: true }).click();
+}
 if (COUPS_BAS) {
   await page.getByRole("button", { name: "Coups bas", exact: true }).click();
 }
@@ -44,6 +66,7 @@ await page.waitForTimeout(500);
 
 let races = 0;
 let finished = false;
+let idle = 0;
 
 for (let step = 0; step < MAX_STEPS && !finished; step++) {
   const newGame = page.getByRole("button", { name: "Nouvelle partie" });
@@ -65,6 +88,7 @@ for (let step = 0; step < MAX_STEPS && !finished; step++) {
   // both answer to the same label, so one branch covers targeting and picking.
   const target = page.locator('[aria-label^="Choisir"]').first();
   if (await target.count()) {
+    idle = 0;
     await target.click({ timeout: 5000 }).catch(() => undefined);
     await page.waitForTimeout(90);
     continue;
@@ -78,15 +102,30 @@ for (let step = 0; step < MAX_STEPS && !finished; step++) {
       .catch(() => "0")) ?? 0
   );
   const stay = page.getByRole("button", { name: "Souffler" });
+  const go = page.getByRole("button", { name: "Accélérer" });
   if (risk > 28 && (await stay.isEnabled().catch(() => false))) {
+    idle = 0;
     await stay.click();
+  } else if (await go.isEnabled().catch(() => false)) {
+    idle = 0;
+    await go.click();
   } else {
-    const go = page.getByRole("button", { name: "Accélérer" });
-    if (!(await go.isEnabled().catch(() => false))) {
-      problems.push(`board stuck at step ${step}: nothing is playable`);
+    // Nothing for a human to do. Against the AI that is normal for a moment —
+    // it is thinking — so a stall is only called once the board has stayed
+    // dead far longer than any thinking delay.
+    if (++idle > STALL_POLLS) {
+      const line = await page
+        .locator('[aria-live="polite"]')
+        .first()
+        .innerText()
+        .catch(() => "?");
+      problems.push(
+        `plateau figé à l'étape ${step} : plus rien n'est jouable — « ${line.replace(/\n/g, " ")} »`
+      );
       break;
     }
-    await go.click();
+    await page.waitForTimeout(200);
+    continue;
   }
   await page.waitForTimeout(90);
 }
@@ -111,5 +150,6 @@ if (problems.length > 0) {
   process.exit(1);
 }
 console.log(
-  `smoke ok (${COUPS_BAS ? "Coups bas" : "classique"}) — ${races} courses jusqu'à la ligne d'arrivée`
+  `smoke ok (${SOLO ? "solo" : "local"} · ${COUPS_BAS ? "Coups bas" : "classique"})` +
+    ` — ${races} courses jusqu'à la ligne d'arrivée`
 );

@@ -19,7 +19,7 @@
 // concatenate strings. TypeScript keeps seats as numbers and converts at the
 // read/write boundary.
 
-import { RulesetId } from "@/game/types";
+import { GamePhase, RulesetId } from "@/game/types";
 
 export type Seat = number;
 
@@ -197,7 +197,14 @@ export interface PublicState {
    * target — it is not always the seat whose turn it is.
    */
   actor: string;
-  phase: "draw" | "decide" | "targeting" | "settling";
+  /**
+   * Derived from the engine's own phases rather than listed again here. A
+   * hand-written list drifts silently: it claimed four phases while the client
+   * cast and wrote five, and the database rules — which key off this value —
+   * had no way to know. "settling" is the one phase the engine does not have:
+   * it marks the moment a race is scored and the writer keeps the pen.
+   */
+  phase: Exclude<GamePhase, "roundOver" | "gameOver"> | "settling";
   /** Ref of the next undrawn card, e.g. "d/17". */
   cursorRef: string;
   /**
