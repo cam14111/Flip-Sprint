@@ -277,6 +277,9 @@ export type GameEvent =
   | { type: "secondWindPassed"; from: number; to: number }
   | { type: "secondWindDropped"; seat: number }
   | { type: "cramp"; seat: number; value: number }
+  | { type: "wall"; seat: number }
+  | { type: "penalty"; seat: number; value: number; by: number }
+  | { type: "coupDeBarre"; seat: number; by: number }
   | { type: "perfect"; seat: number }
   | { type: "banked"; seat: number }
   | { type: "whistled"; seat: number; by: number }

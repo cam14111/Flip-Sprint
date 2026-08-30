@@ -17,7 +17,8 @@ import { patchRunner, takeCard, toDiscard, withEvent } from "./state";
 import {
   activeCount,
   activeSeats,
-  hasNumber,
+  countNumber,
+  holdsCard,
   laneScore,
   leaders,
   numberCount,
@@ -27,12 +28,20 @@ import {
   BURST,
   BURST_SIZE,
   Card,
+  COUP_DE_BARRE,
+  DOSSARD_FETICHE,
+  FAUX_DEPART,
   Difficulty,
   GameAction,
   GameMode,
   GameState,
+  isCoupsBasAction,
   isModifierCard,
   isNumberCard,
+  isPenaltyCard,
+  LE_MUR,
+  numberValue,
+  penaltyValue,
   PERFECT_COUNT,
   RulesetId,
   RunnerState,
@@ -185,6 +194,25 @@ const targetsFor = (
       (seat) => seat !== from && state.players[seat].secondWind === null
     );
   }
+
+  // Coups bas: catching your breath no longer puts you out of reach. A runner
+  // who has banked keeps their cards on the table, so they can still be given
+  // a penalty, robbed, or swapped with — and can still cramp afterwards. Only
+  // a cramped lane is beyond help, and even that changes under Nuit noire,
+  // where a penalty can still be piled onto it.
+  if (
+    isPenaltyCard(code) ||
+    code === COUP_DE_BARRE ||
+    isCoupsBasAction(code)
+  ) {
+    const penalty = isPenaltyCard(code) || code === COUP_DE_BARRE;
+    return state.players.flatMap((p, seat) => {
+      if (p.out) return [];
+      if (p.status === "running" || p.status === "banked") return [seat];
+      return penalty && state.brutal && p.status === "cramped" ? [seat] : [];
+    });
+  }
+
   return running;
 };
 
@@ -193,13 +221,51 @@ export const legalTargets = (state: GameState): number[] =>
     ? targetsFor(state, state.pendingAssign.card.code, state.actor)
     : [];
 
-/** True when the actor is allowed to catch their breath rather than accelerate. */
-export const canStay = (state: GameState): boolean =>
-  state.phase === "decide" && state.players[state.actor].opened;
+/**
+ * True when the actor is allowed to catch their breath rather than accelerate.
+ *
+ * The Faux départ takes that choice away: whoever holds it has to keep running
+ * and can only redeem the race with a Sprint parfait. The restriction lives
+ * with the card, so losing it — robbed, swapped, made to drop it — hands the
+ * choice straight back.
+ */
+export const canStay = (state: GameState): boolean => {
+  if (state.phase !== "decide") return false;
+  const runner = state.players[state.actor];
+  return runner.opened && !holdsCard(runner, FAUX_DEPART);
+};
 
 // ---------------------------------------------------------------------------
 // Card resolution
 // ---------------------------------------------------------------------------
+
+/**
+ * Whether taking `card` collapses `seat`'s lane.
+ *
+ * Two Coups bas cards bend the duplicate rule, and both are settled here so
+ * that nothing downstream has to know about them:
+ *
+ * - **Le Mur** never cramps. Its power — wiping the lane — takes priority, so
+ *   a runner already holding a 7 is purged rather than cramped. A plain 7 taken
+ *   *afterwards* is an ordinary duplicate and does cramp.
+ * - The **Dossard fétiche** lets its holder carry exactly one extra 13, in
+ *   either order. A third 13 cramps like anything else.
+ */
+const cramps = (runner: RunnerState, card: Card): boolean => {
+  const value = numberValue(card.code);
+  if (value === null) return false;
+  if (card.code === LE_MUR) return false;
+
+  const already = countNumber(runner, value);
+  if (already === 0) return false;
+
+  if (value === 13 && already === 1) {
+    const fetiche =
+      holdsCard(runner, DOSSARD_FETICHE) || card.code === DOSSARD_FETICHE;
+    if (fetiche) return false;
+  }
+  return true;
+};
 
 /**
  * Applies a freshly drawn card to `seat`. `inBurst` says whether this draw is
@@ -217,7 +283,15 @@ const resolveCard = (
 
   // --- Number card --------------------------------------------------------
   if (isNumberCard(card.code)) {
-    if (hasNumber(runner, card.code)) {
+    // Le Mur is settled before any duplicate check — see `cramps`. Everything
+    // the runner had built goes, penalties included; the wall stands alone.
+    if (card.code === LE_MUR) {
+      s = toDiscard(s, runner.lane);
+      s = patchRunner(s, seat, (r) => ({ ...r, lane: [card] }));
+      return withEvent(s, { type: "wall", seat });
+    }
+
+    if (cramps(runner, card)) {
       if (runner.secondWind) {
         // Both the duplicate and the Second souffle leave play; the runner
         // keeps going. Usable mid-Rafale, unlike the other action cards.
@@ -227,7 +301,7 @@ const resolveCard = (
         return withEvent(s, {
           type: "secondWindUsed",
           seat,
-          value: card.code,
+          value: numberValue(card.code) ?? card.code,
         });
       }
       // Crampe: the lane is worth nothing and every card in it leaves play.
@@ -240,7 +314,11 @@ const resolveCard = (
         lane: [],
         status: "cramped",
       }));
-      return withEvent(s, { type: "cramp", seat, value: card.code });
+      return withEvent(s, {
+        type: "cramp",
+        seat,
+        value: numberValue(card.code) ?? card.code,
+      });
     }
 
     s = patchRunner(s, seat, (r) => ({ ...r, lane: [...r.lane, card] }));
@@ -266,6 +344,14 @@ const resolveCard = (
           seat,
           value: (card.code - 20) * 2 + 2,
         });
+  }
+
+  // --- Penalty ------------------------------------------------------------
+  // Handed to a runner rather than kept, exactly like an action card — and set
+  // aside in the same way when it turns up in the middle of a Bourrasque.
+  if (isPenaltyCard(card.code) || card.code === COUP_DE_BARRE) {
+    if (inBurst) return { ...s, deferred: [...s.deferred, card] };
+    return { ...s, pendingAssign: { card, deferred: false }, phase: "targeting" };
   }
 
   // --- Second souffle -----------------------------------------------------
@@ -487,7 +573,23 @@ export const reduce = (prev: GameState, action: GameAction): GameState => {
       const { card } = pending;
       let s: GameState = { ...state, pendingAssign: null };
 
-      if (card.code === SECOND_WIND) {
+      if (isPenaltyCard(card.code) || card.code === COUP_DE_BARRE) {
+        s = patchRunner(s, action.target, (r) => ({
+          ...r,
+          lane: [...r.lane, card],
+        }));
+        s = withEvent(
+          s,
+          card.code === COUP_DE_BARRE
+            ? { type: "coupDeBarre", seat: action.target, by: state.actor }
+            : {
+                type: "penalty",
+                seat: action.target,
+                value: penaltyValue(card.code),
+                by: state.actor,
+              }
+        );
+      } else if (card.code === SECOND_WIND) {
         s = patchRunner(s, action.target, (r) => ({ ...r, secondWind: card }));
         s = withEvent(s, {
           type: "secondWindPassed",
