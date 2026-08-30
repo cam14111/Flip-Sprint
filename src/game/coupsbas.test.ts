@@ -6,6 +6,7 @@
 // easier to reason about as a stacked deck than as a screen.
 
 import { describe, expect, it } from "vitest";
+import { aiMustAct, decideAction } from "./ai";
 import { canStay, legalCardPicks, legalTargets, reduce } from "./engine";
 import { laneScore } from "./scoring";
 import { stackedGame } from "./test-utils";
@@ -428,5 +429,62 @@ describe("Nuit noire — le Sprint parfait", () => {
     for (let i = 0; i < 13; i++) g = hit(g);
     expect(g.players[0].perfect).toBe(true);
     expect(g.phase).not.toBe("bounty");
+  });
+});
+
+describe("l'IA résout les cartes qui demandent de pointer", () => {
+  // Signalé deux fois en jeu : le plateau se fige, l'IA « choisit une cible »
+  // et ne choisit jamais. La première fois c'était le pilote React qui ne la
+  // réveillait pas ; ce test-ci prend le problème par l'autre bout et vérifie
+  // que, réveillée, elle sait effectivement conclure — Relais compris, qui est
+  // la seule carte à demander DEUX désignations d'affilée.
+  const aiTable = (pending: CardCode, lanes: CardCode[][]): GameState => {
+    const base = game([]);
+    return {
+      ...base,
+      players: lanes.map((codes, seat) => ({
+        ...base.players[seat],
+        isAI: true,
+        lane: codes.map((code, i) => card(`p${seat}c${i}`, code)),
+      })),
+      actor: 0,
+      phase: pending === RELAY ? "picking" : "targeting",
+      pendingAssign: { card: card("act", pending), deferred: false },
+    };
+  };
+
+  /** Plays the AI until the card in flight has been fully resolved. */
+  const letAiFinish = (start: GameState): GameState => {
+    let g = start;
+    for (let i = 0; i < 10; i++) {
+      // Every seat here is an AI, so "is it still the AI's turn?" would never
+      // become false: what we are waiting on is the card being settled.
+      if (g.pendingAssign === null) return g;
+      expect(aiMustAct(g), `l'IA n'est pas sollicitée en ${g.phase}`).toBe(true);
+      const action = decideAction(g, legalTargets(g));
+      expect(action, `aucun coup en phase ${g.phase}`).not.toBeNull();
+      const next = reduce(g, action!);
+      expect(next, `coup illégal en phase ${g.phase}`).not.toBe(g);
+      g = next;
+    }
+    throw new Error("l'IA n'en finit pas");
+  };
+
+  it("un Relais : deux cartes désignées, puis on avance", () => {
+    const g = letAiFinish(aiTable(RELAY, [[4, 10], [11], [1, 11]]));
+    expect(g.pendingAssign).toBeNull();
+    expect(g.phase).not.toBe("picking");
+  });
+
+  it("une Aspiration : le coureur, puis la carte", () => {
+    const g = letAiFinish(aiTable(DRAFT, [[4], [11], [1]]));
+    expect(g.pendingAssign).toBeNull();
+    expect(g.phase).not.toBe("picking");
+  });
+
+  it("un Faux pas : le coureur, puis la carte", () => {
+    const g = letAiFinish(aiTable(STUMBLE, [[4], [11], [1]]));
+    expect(g.pendingAssign).toBeNull();
+    expect(g.phase).not.toBe("picking");
   });
 });
