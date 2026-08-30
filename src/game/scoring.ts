@@ -68,7 +68,12 @@ export const lanePenalties = (runner: RunnerState): number[] =>
  * below zero.
  */
 export const laneScore = (runner: RunnerState, brutal = false): number => {
-  if (runner.status === "cramped") return 0;
+  // A cramped lane is worth nothing — but Nuit noire lets a penalty be piled
+  // onto one, and a penalty nobody can feel would be no penalty at all.
+  if (runner.status === "cramped") {
+    if (!brutal) return 0;
+    return -lanePenalties(runner).reduce((sum, v) => sum + v, 0);
+  }
 
   let total = laneNumbers(runner).reduce((sum, v) => sum + v, 0);
   if (hasTurbo(runner)) total *= 2;

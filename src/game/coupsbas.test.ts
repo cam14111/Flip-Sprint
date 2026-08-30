@@ -6,19 +6,24 @@
 // easier to reason about as a stacked deck than as a screen.
 
 import { describe, expect, it } from "vitest";
-import { canStay, reduce } from "./engine";
+import { canStay, legalCardPicks, reduce } from "./engine";
 import { laneScore } from "./scoring";
 import { stackedGame } from "./test-utils";
 import {
   CardCode,
   COUP_DE_BARRE,
   DOSSARD_FETICHE,
+  DRAFT,
   FAUX_DEPART,
   GameState,
+  LAST_STRAIGHT,
   LE_MUR,
   PENALTY_10,
   PENALTY_6,
   PERFECT_BONUS,
+  RELAY,
+  SQUALL,
+  STUMBLE,
 } from "./types";
 
 /** A two-runner Coups bas game whose deck is exactly `codes`. */
@@ -215,5 +220,163 @@ describe("les pénalités", () => {
     g = hit(g); // A: une deuxième pénalité identique
     g = assign(g, 0);
     expect(g.players[0].status).toBe("running");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The five actions
+// ---------------------------------------------------------------------------
+
+const card = (id: string, code: CardCode) => ({ id, code });
+
+/** A game posed by hand: some situations take a dozen draws to reach. */
+const posed = (
+  lanes: CardCode[][],
+  pending: CardCode,
+  extra: Partial<GameState> = {}
+): GameState => {
+  const g = game([]);
+  return {
+    ...g,
+    players: lanes.map((codes, seat) => ({
+      ...g.players[seat],
+      lane: codes.map((code, i) => card(`p${seat}c${i}`, code)),
+    })),
+    actor: 0,
+    phase: "picking",
+    pendingAssign: { card: card("act", pending), deferred: false },
+    ...extra,
+  };
+};
+
+describe("Dernière ligne droite", () => {
+  it("fait prendre une carte puis force à souffler", () => {
+    let g = game([LAST_STRAIGHT, 1, 4]);
+    g = hit(g); // A tire la carte action
+    expect(g.phase).toBe("targeting");
+    g = assign(g, 1); // sur B
+    expect(g.actor).toBe(1);
+    expect(g.phase).toBe("draw");
+    g = hit(g); // B prend sa dernière carte
+    expect(g.players[1].status).toBe("banked");
+  });
+
+  it("atteint un coureur qui avait déjà soufflé, sans le remettre en course", () => {
+    const base = game([9]);
+    let g: GameState = {
+      ...base,
+      players: [
+        { ...base.players[0], opened: true },
+        {
+          ...base.players[1],
+          opened: true,
+          status: "banked",
+          lane: [card("b0", 5)],
+        },
+      ],
+      actor: 0,
+      phase: "targeting",
+      pendingAssign: { card: card("act", LAST_STRAIGHT), deferred: false },
+    };
+    g = assign(g, 1);
+    expect(g.actor).toBe(1);
+    g = hit(g); // B subit la carte forcée bien qu'il ait soufflé
+    expect(g.players[1].lane.map((c) => c.code)).toContain(9);
+    expect(g.players[1].status).toBe("banked");
+  });
+});
+
+describe("Bourrasque", () => {
+  it("fait prendre quatre cartes", () => {
+    let g = game([SQUALL, 1, 2, 3, 4, 5]);
+    g = hit(g);
+    g = assign(g, 1);
+    expect(g.burstLeft).toBe(4);
+    for (let i = 0; i < 4; i++) g = hit(g);
+    // B n'avait pas encore de carte d'ouverture : la Bourrasque lui en donne
+    // quatre, et rien de plus.
+    expect(g.players[1].lane).toHaveLength(4);
+  });
+
+  it("s'arrête net sur une crampe", () => {
+    let g = game([SQUALL, 2, 3, 2, 9]);
+    g = hit(g); // A tire la Bourrasque
+    g = assign(g, 1); // B la subit
+    g = hit(g); // B: 2
+    g = hit(g); // B: 3
+    g = hit(g); // B: 2 → crampe
+    expect(g.players[1].status).toBe("cramped");
+    expect(g.burstLeft).toBe(0);
+  });
+});
+
+describe("Aspiration", () => {
+  it("prend la carte choisie et la met dans son couloir", () => {
+    let g = posed([[5], [12]], DRAFT, { pendingAssign: null });
+    g = { ...g, pendingAssign: { card: card("act", DRAFT), deferred: false, target: 1 } };
+    g = reduce(g, { type: "pick", ref: "p1c0" });
+    expect(g.players[0].lane.map((c) => c.code)).toEqual([5, 12]);
+    expect(g.players[1].lane).toHaveLength(0);
+  });
+
+  it("peut faire cramper le voleur", () => {
+    let g = posed([[8], [8]], DRAFT);
+    g = { ...g, pendingAssign: { card: card("act", DRAFT), deferred: false, target: 1 } };
+    g = reduce(g, { type: "pick", ref: "p1c0" });
+    expect(g.players[0].status).toBe("cramped");
+  });
+
+  it("voler Le Mur vide le couloir du voleur", () => {
+    let g = posed([[5, 9], [LE_MUR]], DRAFT);
+    g = { ...g, pendingAssign: { card: card("act", DRAFT), deferred: false, target: 1 } };
+    g = reduce(g, { type: "pick", ref: "p1c0" });
+    expect(g.players[0].lane.map((c) => c.code)).toEqual([LE_MUR]);
+  });
+});
+
+describe("Faux pas", () => {
+  it("retire la carte choisie", () => {
+    let g = posed([[5], [12, 3]], STUMBLE);
+    g = { ...g, pendingAssign: { card: card("act", STUMBLE), deferred: false, target: 1 } };
+    g = reduce(g, { type: "pick", ref: "p1c0" });
+    expect(g.players[1].lane.map((c) => c.code)).toEqual([3]);
+  });
+
+  it("défausser le Faux départ rend le droit de souffler", () => {
+    let g = posed([[FAUX_DEPART, 4], [9]], STUMBLE);
+    g = {
+      ...g,
+      players: g.players.map((p) => ({ ...p, opened: true })),
+      actor: 1,
+      pendingAssign: { card: card("act", STUMBLE), deferred: false, target: 0 },
+    };
+    g = reduce(g, { type: "pick", ref: "p0c0" });
+    const decide = { ...g, actor: 0, phase: "decide" as const };
+    expect(canStay(decide)).toBe(true);
+  });
+});
+
+describe("Relais", () => {
+  it("échange deux cartes entre deux couloirs", () => {
+    let g = posed([[5], [12]], RELAY);
+    g = reduce(g, { type: "pick", ref: "p0c0" });
+    g = reduce(g, { type: "pick", ref: "p1c0" });
+    expect(g.players[0].lane.map((c) => c.code)).toEqual([12]);
+    expect(g.players[1].lane.map((c) => c.code)).toEqual([5]);
+  });
+
+  it("ne propose pas deux cartes du même couloir", () => {
+    let g = posed([[5, 6], [12]], RELAY);
+    g = reduce(g, { type: "pick", ref: "p0c0" });
+    expect(legalCardPicks(g)).toEqual(["p1c0"]);
+  });
+
+  it("peut faire cramper LES DEUX coureurs d'un coup", () => {
+    // A : 10, 11 — B : 10, 11. On échange le 10 de A contre le 11 de B.
+    let g = posed([[10, 11], [10, 11]], RELAY);
+    g = reduce(g, { type: "pick", ref: "p0c0" });
+    g = reduce(g, { type: "pick", ref: "p1c1" });
+    expect(g.players[0].status).toBe("cramped");
+    expect(g.players[1].status).toBe("cramped");
   });
 });

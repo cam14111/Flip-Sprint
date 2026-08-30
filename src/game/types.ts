@@ -205,6 +205,8 @@ export type Difficulty = "easy" | "normal" | "hard";
  * "draw"      — the actor MUST take a card (opening deal, or mid-Rafale)
  * "decide"    — the actor may accelerate or catch their breath
  * "targeting" — the actor must hand out an action card they just drew
+ * "picking"   — the actor must point at a card: which one to steal, to make
+ *               somebody drop, or to swap (Coups bas only)
  * "roundOver" — the race is scored
  * "gameOver"  — the finish line was crossed
  */
@@ -212,6 +214,7 @@ export const ALL_PHASES = [
   "draw",
   "decide",
   "targeting",
+  "picking",
   "roundOver",
   "gameOver",
 ] as const;
@@ -226,6 +229,13 @@ export interface PendingAssign {
    * out now that the Rafale is over (drives the wording in the UI).
    */
   deferred: boolean;
+  /**
+   * Coups bas: the runner already chosen, when the card also needs a card to
+   * be pointed at (Aspiration, Faux pas). Undefined until they are picked.
+   */
+  target?: number;
+  /** Coups bas: the first of the two cards a Relais swaps. */
+  firstRef?: string;
 }
 
 export interface GameState {
@@ -249,6 +259,12 @@ export interface GameState {
   burstQueue: number[];
   /** The action card whose target the actor must choose (phase "targeting"). */
   pendingAssign: PendingAssign | null;
+  /**
+   * Coups bas: the runner a Dernière ligne droite has condemned. Once their
+   * forced card is fully resolved they must catch their breath, whether they
+   * wanted to or not.
+   */
+  mustBank: number | null;
   deck: Card[];
   discard: Card[];
   /** Race counter within the game (1-based). */
@@ -284,6 +300,10 @@ export type GameEvent =
   | { type: "banked"; seat: number }
   | { type: "whistled"; seat: number; by: number }
   | { type: "burstStart"; seat: number; by: number }
+  | { type: "lastStraight"; seat: number; by: number }
+  | { type: "stolen"; from: number; to: number; code: CardCode }
+  | { type: "dropped"; seat: number; by: number; code: CardCode }
+  | { type: "swapped"; a: number; b: number }
   | { type: "deferredDropped"; seat: number; count: number }
   | { type: "reshuffle" }
   | { type: "forfeit"; seat: number }
@@ -293,4 +313,5 @@ export type GameEvent =
 export type GameAction =
   | { type: "hit" } // Accélérer
   | { type: "stay" } // Souffler
-  | { type: "assign"; target: number }; // hand out an action card
+  | { type: "assign"; target: number } // hand out an action card
+  | { type: "pick"; ref: string }; // point at a card (Coups bas)

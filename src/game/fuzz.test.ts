@@ -11,14 +11,16 @@ import {
   createGame,
   dealNextRound,
   forfeitRunner,
+  legalCardPicks,
   legalTargets,
   MAX_RUNNERS,
   MIN_RUNNERS,
   reduce,
 } from "./engine";
+import { laneDuplicate } from "./lane";
 import { laneScore } from "./scoring";
 import { checkInvariants, makeRng, randomAction } from "./test-utils";
-import { GameState } from "./types";
+import { GameState, RulesetId } from "./types";
 
 /** Generous ceiling: hitting it means the engine failed to make progress. */
 const MAX_STEPS = 60_000;
@@ -32,11 +34,19 @@ interface RunResult {
 const playRandomGame = (
   seed: number,
   playerCount: number,
-  opts: { forfeitAt?: number } = {}
+  opts: { forfeitAt?: number; ruleset?: RulesetId; brutal?: boolean } = {}
 ): RunResult => {
   const names = Array.from({ length: playerCount }, (_, i) => `J${i + 1}`);
-  let state = createGame({ names, seed, scoreLimit: 200 });
-  checkInvariants(state, DECK_SIZE.classique);
+  const ruleset = opts.ruleset ?? "classique";
+  const size = DECK_SIZE[ruleset];
+  let state = createGame({
+    names,
+    seed,
+    scoreLimit: 200,
+    ruleset,
+    brutal: opts.brutal,
+  });
+  checkInvariants(state, size);
 
   const rand = makeRng(seed);
   let steps = 0;
@@ -50,7 +60,7 @@ const playRandomGame = (
     if (state.phase === "roundOver") {
       state = dealNextRound(state);
       rounds++;
-      checkInvariants(state, DECK_SIZE.classique);
+      checkInvariants(state, size);
       continue;
     }
 
@@ -58,7 +68,7 @@ const playRandomGame = (
     if (opts.forfeitAt === steps && playerCount > MIN_RUNNERS) {
       const victim = Math.floor(rand() * playerCount);
       const next = forfeitRunner(state, victim);
-      checkInvariants(next, DECK_SIZE.classique);
+      checkInvariants(next, size);
       state = next;
       continue;
     }
@@ -67,12 +77,15 @@ const playRandomGame = (
     if (state.phase === "targeting" && targets.length === 0) {
       throw new Error(`a card awaits a target nobody can take (seed ${seed})`);
     }
+    if (state.phase === "picking" && legalCardPicks(state).length === 0) {
+      throw new Error(`a card awaits a pick nobody can make (seed ${seed})`);
+    }
 
     const next = reduce(state, randomAction(state, targets, rand));
     if (next === state) {
       throw new Error(`legal action rejected in phase ${state.phase}`);
     }
-    checkInvariants(next, DECK_SIZE.classique);
+    checkInvariants(next, size);
     state = next;
   }
 
@@ -132,6 +145,43 @@ describe("des milliers de parties aléatoires", () => {
       const b = playRandomGame(seed, 4);
       expect(JSON.stringify(a.state)).toBe(JSON.stringify(b.state));
       expect(a.steps).toBe(b.steps);
+    }
+  }, 60_000);
+});
+
+describe("des milliers de parties Coups bas", () => {
+  it("conservent les 108 cartes et terminent, de 2 à 8 coureurs", () => {
+    // Le vrai risque de cette variante : les cartes changent de couloir. Voler,
+    // faire défausser, échanger — chacune est une occasion d'en perdre une, ou
+    // d'en fabriquer deux. L'invariant de conservation est vérifié après CHAQUE
+    // transition, pas seulement en fin de partie.
+    let games = 0;
+    for (let playerCount = MIN_RUNNERS; playerCount <= MAX_RUNNERS; playerCount++) {
+      for (let seed = 1; seed <= 60; seed++) {
+        const { state } = playRandomGame(seed * 6151 + playerCount, playerCount, {
+          ruleset: "coupsbas",
+        });
+        expect(state.phase).toBe("gameOver");
+        games++;
+      }
+    }
+    expect(games).toBe(7 * 60);
+  }, 120_000);
+
+  it("ne laissent jamais un couloir avec un doublon interdit", () => {
+    for (let seed = 1; seed <= 120; seed++) {
+      const { state } = playRandomGame(seed * 2749, 2 + (seed % 7), {
+        ruleset: "coupsbas",
+      });
+      for (const p of state.players) expect(laneDuplicate(p)).toBeNull();
+    }
+  }, 60_000);
+
+  it("restent déterministes, et le sont aussi en Nuit noire", () => {
+    for (let seed = 1; seed <= 30; seed++) {
+      const a = playRandomGame(seed, 4, { ruleset: "coupsbas", brutal: true });
+      const b = playRandomGame(seed, 4, { ruleset: "coupsbas", brutal: true });
+      expect(JSON.stringify(a.state)).toBe(JSON.stringify(b.state));
     }
   }, 60_000);
 });

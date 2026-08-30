@@ -5,7 +5,12 @@
 // codes are handed out top-first, in the order written.
 
 import { DECK_SIZE } from "./deck";
-import { createGame, CreateGameOptions } from "./engine";
+import {
+  canStay,
+  createGame,
+  CreateGameOptions,
+  legalCardPicks,
+} from "./engine";
 import { drawableCounts } from "./odds";
 import {
   Card,
@@ -13,6 +18,7 @@ import {
   GameAction,
   GameState,
   isNumberCard,
+  isPenaltyCard,
 } from "./types";
 
 /** A game whose deck is exactly `codes`, first element drawn first. */
@@ -75,16 +81,20 @@ export const checkInvariants = (state: GameState, deckSize: number): void => {
     if (numbers.length > 7) {
       throw new Error(`${runner.name} holds ${numbers.length} numbers`);
     }
-    if (runner.status === "cramped" && runner.lane.length > 0) {
-      throw new Error("a cramped runner still holds cards");
+    // A cramped lane is emptied — except in Nuit noire, where a penalty may
+    // still be dropped onto it.
+    if (runner.status === "cramped" && runner.lane.some((c) => !isPenaltyCard(c.code))) {
+      throw new Error(`${runner.name} is cramped but holds more than penalties`);
     }
   }
 
-  if (state.phase === "targeting" && !state.pendingAssign) {
-    throw new Error("targeting phase with nothing to assign");
+  // A card in flight and the phase that resolves it go together, both ways.
+  const resolving = state.phase === "targeting" || state.phase === "picking";
+  if (resolving && !state.pendingAssign) {
+    throw new Error(`${state.phase} phase with nothing to resolve`);
   }
-  if (state.pendingAssign && state.phase !== "targeting") {
-    throw new Error("a card awaits a target outside the targeting phase");
+  if (state.pendingAssign && !resolving) {
+    throw new Error("a card awaits resolution outside a resolving phase");
   }
 };
 
@@ -110,6 +120,12 @@ export const randomAction = (
   if (state.phase === "targeting") {
     return { type: "assign", target: targets[Math.floor(rand() * targets.length)] };
   }
+  if (state.phase === "picking") {
+    const picks = legalCardPicks(state);
+    return { type: "pick", ref: picks[Math.floor(rand() * picks.length)] };
+  }
   if (state.phase === "draw") return { type: "hit" };
+  // Coups bas: the Faux départ takes the choice away from whoever holds it.
+  if (!canStay(state)) return { type: "hit" };
   return rand() < 0.6 ? { type: "hit" } : { type: "stay" };
 };

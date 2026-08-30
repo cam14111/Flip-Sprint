@@ -13,15 +13,21 @@
 //    protocol and in the database rules — is asked about `actor`.
 
 import { dealDeck } from "./deck";
+import {
+  applyPick,
+  assignCoupsBas,
+  legalPicks,
+  needsCardPick,
+  SQUALL_SIZE,
+} from "./coupsbas";
+import { receive } from "./lane";
 import { patchRunner, takeCard, toDiscard, withEvent } from "./state";
 import {
   activeCount,
   activeSeats,
-  countNumber,
   holdsCard,
   laneScore,
   leaders,
-  numberCount,
   runningSeats,
 } from "./scoring";
 import {
@@ -29,7 +35,6 @@ import {
   BURST_SIZE,
   Card,
   COUP_DE_BARRE,
-  DOSSARD_FETICHE,
   FAUX_DEPART,
   Difficulty,
   GameAction,
@@ -39,13 +44,12 @@ import {
   isModifierCard,
   isNumberCard,
   isPenaltyCard,
-  LE_MUR,
-  numberValue,
   penaltyValue,
-  PERFECT_COUNT,
+  RELAY,
   RulesetId,
   RunnerState,
   SECOND_WIND,
+  SQUALL,
   TURBO,
   WHISTLE,
 } from "./types";
@@ -125,6 +129,7 @@ export const createGame = (opts: CreateGameOptions = {}): GameState => {
     deferred: [],
     burstQueue: [],
     pendingAssign: null,
+    mustBank: null,
     deck: cards,
     discard: [],
     round: 1,
@@ -159,6 +164,7 @@ export const dealNextRound = (prev: GameState): GameState => {
     deferred: [],
     burstQueue: [],
     pendingAssign: null,
+    mustBank: null,
     deck: cards,
     discard: [],
     round,
@@ -216,6 +222,10 @@ const targetsFor = (
   return running;
 };
 
+/** Which cards the actor may point at (phase "picking"). */
+export const legalCardPicks = (state: GameState): string[] =>
+  legalPicks(state, (code) => targetsFor(state, code, state.actor));
+
 export const legalTargets = (state: GameState): number[] =>
   state.pendingAssign
     ? targetsFor(state, state.pendingAssign.card.code, state.actor)
@@ -240,34 +250,6 @@ export const canStay = (state: GameState): boolean => {
 // ---------------------------------------------------------------------------
 
 /**
- * Whether taking `card` collapses `seat`'s lane.
- *
- * Two Coups bas cards bend the duplicate rule, and both are settled here so
- * that nothing downstream has to know about them:
- *
- * - **Le Mur** never cramps. Its power — wiping the lane — takes priority, so
- *   a runner already holding a 7 is purged rather than cramped. A plain 7 taken
- *   *afterwards* is an ordinary duplicate and does cramp.
- * - The **Dossard fétiche** lets its holder carry exactly one extra 13, in
- *   either order. A third 13 cramps like anything else.
- */
-const cramps = (runner: RunnerState, card: Card): boolean => {
-  const value = numberValue(card.code);
-  if (value === null) return false;
-  if (card.code === LE_MUR) return false;
-
-  const already = countNumber(runner, value);
-  if (already === 0) return false;
-
-  if (value === 13 && already === 1) {
-    const fetiche =
-      holdsCard(runner, DOSSARD_FETICHE) || card.code === DOSSARD_FETICHE;
-    if (fetiche) return false;
-  }
-  return true;
-};
-
-/**
  * Applies a freshly drawn card to `seat`. `inBurst` says whether this draw is
  * part of a Rafale — it decides whether a Coup de sifflet or a Rafale is handed
  * out now or set aside until the Rafale is over.
@@ -282,57 +264,10 @@ const resolveCard = (
   const runner = s.players[seat];
 
   // --- Number card --------------------------------------------------------
-  if (isNumberCard(card.code)) {
-    // Le Mur is settled before any duplicate check — see `cramps`. Everything
-    // the runner had built goes, penalties included; the wall stands alone.
-    if (card.code === LE_MUR) {
-      s = toDiscard(s, runner.lane);
-      s = patchRunner(s, seat, (r) => ({ ...r, lane: [card] }));
-      return withEvent(s, { type: "wall", seat });
-    }
-
-    if (cramps(runner, card)) {
-      if (runner.secondWind) {
-        // Both the duplicate and the Second souffle leave play; the runner
-        // keeps going. Usable mid-Rafale, unlike the other action cards.
-        const spent = runner.secondWind;
-        s = patchRunner(s, seat, (r) => ({ ...r, secondWind: null }));
-        s = toDiscard(s, [card, spent]);
-        return withEvent(s, {
-          type: "secondWindUsed",
-          seat,
-          value: numberValue(card.code) ?? card.code,
-        });
-      }
-      // Crampe: the lane is worth nothing and every card in it leaves play.
-      // Snapshot it first — the end-of-race recap has to be able to show what
-      // was lost, and by scoring time the cards are long gone to the discard.
-      s = toDiscard(s, [...runner.lane, card]);
-      s = patchRunner(s, seat, (r) => ({
-        ...r,
-        lastLane: [...r.lane.map((c) => c.code), card.code],
-        lane: [],
-        status: "cramped",
-      }));
-      return withEvent(s, {
-        type: "cramp",
-        seat,
-        value: numberValue(card.code) ?? card.code,
-      });
-    }
-
-    s = patchRunner(s, seat, (r) => ({ ...r, lane: [...r.lane, card] }));
-    if (numberCount(s.players[seat]) === PERFECT_COUNT) {
-      // Sprint parfait: banked with the bonus, and the race ends for everyone.
-      s = patchRunner(s, seat, (r) => ({
-        ...r,
-        perfect: true,
-        status: "banked",
-      }));
-      return withEvent(s, { type: "perfect", seat });
-    }
-    return s;
-  }
+  // Le Mur, the duplicate rule, the Second souffle and the Sprint parfait all
+  // depend on the lane rather than on the turn, so they live in `lane.ts` —
+  // shared with the Coups bas cards that move a card from one lane to another.
+  if (isNumberCard(card.code)) return receive(s, seat, card);
 
   // --- Modifier card ------------------------------------------------------
   if (isModifierCard(card.code)) {
@@ -370,12 +305,17 @@ const resolveCard = (
     return { ...s, pendingAssign: { card, deferred: false }, phase: "targeting" };
   }
 
-  // --- Coup de sifflet / Rafale -------------------------------------------
-  // Drawn during a Rafale, these are set aside and only handed out once the
-  // Rafale is over — and discarded outright if the runner cramps or sprints
-  // perfectly in the meantime.
+  // --- Action cards --------------------------------------------------------
+  // Drawn during a Rafale or a Bourrasque, these are set aside and only handed
+  // out once it is over — and discarded outright if the runner cramps or
+  // sprints perfectly in the meantime.
   if (inBurst) {
     return { ...s, deferred: [...s.deferred, card] };
+  }
+  // A Relais names no runner: it points straight at two cards, wherever they
+  // sit, so it skips the targeting step entirely.
+  if (card.code === RELAY) {
+    return { ...s, pendingAssign: { card, deferred: false }, phase: "picking" };
   }
   return { ...s, pendingAssign: { card, deferred: false }, phase: "targeting" };
 };
@@ -428,6 +368,7 @@ export const endRound = (state: GameState): GameState => {
     deferred: [],
     burstQueue: [],
     pendingAssign: null,
+    mustBank: null,
     phase: "roundOver",
   };
   s = withEvent(s, { type: "roundOver", scores });
@@ -473,8 +414,27 @@ const advance = (state: GameState): GameState => {
   if (state.players.some((p) => p.perfect)) return endRound(state);
   if (runningSeats(state.players).length === 0) return endRound(state);
 
-  // Mid-resolution: an action card is waiting for its target.
-  if (state.pendingAssign) return { ...state, phase: "targeting" };
+  // Mid-resolution: a card is waiting to be handed out or pointed at. The two
+  // are not interchangeable — a Relais takes two picks in a row, and dropping
+  // back to "targeting" between them would strand it.
+  const pending = state.pendingAssign;
+  if (pending) {
+    const picking =
+      pending.card.code === RELAY ||
+      (needsCardPick(pending.card.code) && pending.target !== undefined);
+    const next: GameState = { ...state, phase: picking ? "picking" : "targeting" };
+    const options = picking
+      ? legalCardPicks(next).length
+      : targetsFor(next, pending.card.code, next.actor).length;
+    // An action with nowhere to go is simply discarded — a Relais needs two
+    // lanes holding cards, and late in a race there may not be two left.
+    if (options === 0) {
+      return advance(
+        toDiscard({ ...state, pendingAssign: null }, [pending.card])
+      );
+    }
+    return next;
+  }
 
   let s = state;
   // Only a cramp (or a Sprint parfait, already handled above) cancels what a
@@ -498,14 +458,30 @@ const advance = (state: GameState): GameState => {
 
   if (s.burstLeft > 0) return { ...s, phase: "draw" };
 
+  // A Dernière ligne droite: the forced card has been resolved, so its target
+  // is now made to stop — unless the card already took them out of the race.
+  if (s.mustBank !== null) {
+    const seat = s.mustBank;
+    s = { ...s, mustBank: null };
+    if (s.players[seat].status === "running") {
+      s = withEvent(
+        patchRunner(s, seat, (r) => ({ ...r, status: "banked" })),
+        { type: "banked", seat }
+      );
+      if (runningSeats(s.players).length === 0) return endRound(s);
+    }
+  }
+
   if (s.deferred.length > 0) {
+    // Back through `advance` rather than straight to "targeting": a Relais set
+    // aside during a Bourrasque names no runner, so it has to reach the picking
+    // phase like it would have done had it been drawn on its own.
     const [card, ...rest] = s.deferred;
-    return {
+    return advance({
       ...s,
       deferred: rest,
       pendingAssign: { card, deferred: true },
-      phase: "targeting",
-    };
+    });
   }
 
   // Queued Rafales run once every pending assignment has been made. A runner
@@ -514,9 +490,21 @@ const advance = (state: GameState): GameState => {
     const [target, ...rest] = s.burstQueue;
     s = { ...s, burstQueue: rest };
     const runner = s.players[target];
-    if (!runner.out && runner.status === "running") {
+    // Under classique rules a runner who has stopped — banked or whistled — is
+    // out of reach. Coups bas is the one that takes that shelter away, and it
+    // must not leak back into the original game.
+    const reachable =
+      s.ruleset === "coupsbas"
+        ? runner.status === "running" || runner.status === "banked"
+        : runner.status === "running";
+    if (!runner.out && reachable) {
       return withEvent(
-        { ...s, actor: target, burstLeft: BURST_SIZE, phase: "draw" },
+        {
+          ...s,
+          actor: target,
+          burstLeft: s.ruleset === "coupsbas" ? SQUALL_SIZE : BURST_SIZE,
+          phase: "draw",
+        },
         { type: "burstStart", seat: target, by: s.turnSeat }
       );
     }
@@ -537,7 +525,14 @@ export const reduce = (prev: GameState, action: GameAction): GameState => {
     case "hit": {
       if (state.phase !== "draw" && state.phase !== "decide") return prev;
       const runner = state.players[state.actor];
-      if (runner.out || runner.status !== "running") return prev;
+      // A forced card — a Rafale, a Bourrasque, a Dernière ligne droite —
+      // reaches a runner who has already caught their breath: in Coups bas,
+      // stopping is no longer a shelter. Only a cramped lane is beyond reach.
+      const forced = state.burstLeft > 0;
+      if (runner.out) return prev;
+      if (runner.status !== "running" && !(forced && runner.status === "banked")) {
+        return prev;
+      }
 
       // Deck and discard both empty is unreachable with a 94-card deck, but a
       // frozen table would be the worst possible failure — score the race.
@@ -604,12 +599,22 @@ export const reduce = (prev: GameState, action: GameAction): GameState => {
           seat: action.target,
           by: state.actor,
         });
-      } else if (card.code === BURST) {
+      } else if (card.code === BURST || card.code === SQUALL) {
         s = toDiscard(s, [card]);
         s = { ...s, burstQueue: [...s.burstQueue, action.target] };
+      } else {
+        const handled = assignCoupsBas(s, card, action.target, state.actor);
+        if (!handled) return prev;
+        s = handled;
       }
 
       return advance(s);
+    }
+
+    case "pick": {
+      if (state.phase !== "picking" || !state.pendingAssign) return prev;
+      if (!legalCardPicks(state).includes(action.ref)) return prev;
+      return advance(applyPick(state, action.ref));
     }
 
     default:

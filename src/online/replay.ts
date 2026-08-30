@@ -114,6 +114,7 @@ export const initialCourseState = (
     deferred: [],
     burstQueue: [],
     pendingAssign: null,
+    mustBank: null,
     deck: Array.from({ length: DECK_SIZE[ruleset] }, (_, i) => placeholder(i)),
     discard: [],
     round: course,

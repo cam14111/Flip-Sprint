@@ -67,7 +67,9 @@ const recordGame = (
             }
           : action.type === "stay"
             ? { seat, type: "stay" }
-            : { seat, type: "assign", target: action.target };
+            : action.type === "assign"
+              ? { seat, type: "assign", target: action.target }
+              : { seat, type: "assign", target: 0 };
 
       const next = reduce(state, action);
       if (next === state) throw new Error("legal action rejected");
