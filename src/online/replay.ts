@@ -120,6 +120,8 @@ export const initialCourseState = (
     burstQueue: [],
     pendingAssign: null,
     mustBank: null,
+    bounty: null,
+    bountyVictim: null,
     deck: Array.from({ length: DECK_SIZE[ruleset] }, (_, i) => placeholder(i)),
     discard: [],
     round: course,

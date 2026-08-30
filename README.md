@@ -65,8 +65,10 @@ Deux règles changent la façon de jouer plus que les cartes elles-mêmes :
 - **Le Relais est atomique.** On échange, *puis* on juge les deux couloirs :
   un seul Relais peut faire cramper les deux coureurs à la fois.
 
-**Nuit noire** est une sous-option de Coups bas : les scores de course peuvent
-passer sous zéro, et une pénalité peut être collée à un couloir déjà crampé.
+**Nuit noire** est une sous-option de Coups bas. Elle change trois règles : les
+scores de course peuvent passer **sous zéro**, une pénalité peut être collée à
+un couloir déjà crampé, et un **Sprint parfait pose une question** — garder les
+`+15`, ou renoncer au bonus pour retirer `15` points du **total** d'un rival.
 
 > Les mécaniques de jeu ne sont pas protégeables ; les noms et les visuels le
 > sont. Comme pour le reste de Flip Sprint, cette variante n'emprunte que des
@@ -77,7 +79,7 @@ passer sous zéro, et une pénalité peut être collée à un couloir déjà cra
 
 - **Moteur de jeu pur et testé** (`src/game/`) : toutes les règles vivent dans
   un réducteur pur, sans React, sans timer et sans hasard ambiant. Couvert par
-  134 tests, dont plus de 1400 parties aléatoires de 2 à 8 coureurs — sous les
+  138 tests, dont plus de 1400 parties aléatoires de 2 à 8 coureurs — sous les
   deux jeux de règles — qui vérifient à chaque transition la conservation des
   cartes, l'absence de doublon dans un couloir, la terminaison et le
   déterminisme.
@@ -258,7 +260,7 @@ npm run dev            # http://localhost:8080
 ### Vérifier
 
 ```sh
-npm test               # moteur, IA, rejeu — 134 tests
+npm test               # moteur, IA, rejeu — 138 tests
 npm run lint
 npm run build          # typecheck + build de production
 npm run smoke          # joue une partie locale entière dans un vrai navigateur
@@ -267,6 +269,7 @@ npm run check:notch    # la zone derrière l'encoche se raccorde-t-elle au plate
 npm run check:alerts   # l'annonce d'une carte subie se referme-t-elle seule ?
 npm run test:rules     # sondes de sécurité contre l'émulateur
 npm run e2e:online     # deux navigateurs, une vraie course en ligne (14 vérifs)
+npm run e2e:online:coupsbas  # la même course, sous les règles Coups bas
 ```
 
 Les deux derniers demandent **Java** (l'émulateur Realtime Database est un

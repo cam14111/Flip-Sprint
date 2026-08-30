@@ -415,6 +415,36 @@ const main = async () => {
     );
 
     // ---------------------------------------------------------------------
+    // Nuit noire settles a Sprint parfait by pointing at a runner, which is
+    // the same wire action as handing out a card — so the rules must open the
+    // "bounty" phase to it, and to nobody but the actor.
+    console.log("\nNuit noire — le choix du Sprint parfait");
+    const nb = "GGGGGG";
+    await createRace(alice, nb, 3, { phase: "bounty" });
+    await set(ref(bob.db, `games/${nb}/seats/1`), { uid: bob.uid, name: "bob" });
+
+    check(
+      await allowed(() =>
+        set(ref(alice.db, `games/${nb}/courses/c1/actions/a0000`), {
+          seat: "0",
+          type: "assign",
+          target: "1",
+        })
+      ),
+      "l'auteur du Sprint parfait peut désigner sa cible"
+    );
+    check(
+      await denied(() =>
+        set(ref(bob.db, `games/${nb}/courses/c1/actions/a0001`), {
+          seat: "1",
+          type: "assign",
+          target: "0",
+        })
+      ),
+      "personne d'autre ne décide à sa place"
+    );
+
+    // ---------------------------------------------------------------------
     console.log("\nle jeu de règles est figé");
     check(
       await denied(() =>

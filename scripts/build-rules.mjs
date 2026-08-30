@@ -112,8 +112,10 @@ const actionValidate = [
       // Catch your breath: only ever a free choice, never during a forced draw.
       `(${newType} === 'stay' && ${playedByActor} && ${phaseIs("decide")})`,
 
-      // Hand out an action card: only while one is actually waiting.
-      `(${newType} === 'assign' && ${playedByActor} && ${phaseIs("targeting")} && ` +
+      // Hand out an action card: only while one is actually waiting. Nuit
+      // noire settles a Sprint parfait with the same gesture — point at a
+      // runner — so the two phases share this clause.
+      `(${newType} === 'assign' && ${playedByActor} && ${phaseIs("targeting", "bounty")} && ` +
         `newData.child('target').isString() && ` +
         `newData.child('target').val().matches(/^[0-7]$/))`,
 
@@ -234,7 +236,7 @@ const rules = {
             "newData.child('actor').isString() && " +
             "newData.child('actor').val().matches(/^[0-7]$/) && " +
             "newData.child('cursorRef').isString() && " +
-            "newData.child('phase').val().matches(/^(draw|decide|targeting|picking|settling)$/) && " +
+            "newData.child('phase').val().matches(/^(draw|decide|targeting|picking|bounty|settling)$/) && " +
             // A seat that is not playing can never be handed the initiative.
             `(!${game("/start")}.exists() || ` +
             `newData.child('actor').val() < ${game("/start/count")}.val() + '')`,

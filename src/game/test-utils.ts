@@ -117,7 +117,8 @@ export const randomAction = (
   targets: number[],
   rand: () => number
 ): GameAction => {
-  if (state.phase === "targeting") {
+  // "bounty" answers to the same gesture as "targeting": point at a runner.
+  if (state.phase === "targeting" || state.phase === "bounty") {
     return { type: "assign", target: targets[Math.floor(rand() * targets.length)] };
   }
   if (state.phase === "picking") {

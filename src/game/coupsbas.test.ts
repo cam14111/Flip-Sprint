@@ -6,7 +6,7 @@
 // easier to reason about as a stacked deck than as a screen.
 
 import { describe, expect, it } from "vitest";
-import { canStay, legalCardPicks, reduce } from "./engine";
+import { canStay, legalCardPicks, legalTargets, reduce } from "./engine";
 import { laneScore } from "./scoring";
 import { stackedGame } from "./test-utils";
 import {
@@ -378,5 +378,55 @@ describe("Relais", () => {
     g = reduce(g, { type: "pick", ref: "p1c1" });
     expect(g.players[0].status).toBe("cramped");
     expect(g.players[1].status).toBe("cramped");
+  });
+});
+
+describe("Nuit noire — le Sprint parfait", () => {
+  /** A game already in the bounty phase, with A having sprinted perfectly. */
+  const sprinted = (): GameState => {
+    const base = game([], true);
+    const lane = [1, 2, 3, 4, 5, 6, 8].map((code, i) => card(`a${i}`, code));
+    return {
+      ...base,
+      players: [
+        { ...base.players[0], lane, perfect: true, status: "banked", totalScore: 40 },
+        { ...base.players[1], totalScore: 80 },
+      ],
+      actor: 0,
+      bounty: 0,
+      phase: "bounty",
+    };
+  };
+
+  it("laisse le choix entre le bonus et une frappe", () => {
+    expect(sprinted().phase).toBe("bounty");
+    // Se désigner soi-même garde le bonus ; désigner l'autre le donne en frappe.
+    expect(legalTargets(sprinted())).toEqual([0, 1]);
+  });
+
+  it("se désigner soi-même garde les +15", () => {
+    const g = assign(sprinted(), 0);
+    expect(g.players[0].struck).toBeFalsy();
+    expect(g.players[0].lastRoundScore).toBe(29 + PERFECT_BONUS);
+    expect(g.players[1].lastRoundScore).toBe(0);
+  });
+
+  it("désigner un rival lui retire 15 — et coûte le bonus", () => {
+    const g = assign(sprinted(), 1);
+    expect(g.players[0].struck).toBe(true);
+    // Plus de bonus pour l'auteur…
+    expect(g.players[0].lastRoundScore).toBe(29);
+    // …et quinze points de moins sur le total du rival.
+    expect(g.players[1].lastRoundScore).toBe(-PERFECT_BONUS);
+    expect(g.players[1].totalScore).toBe(80 - PERFECT_BONUS);
+  });
+
+  it("hors Nuit noire, le Sprint parfait ne pose aucune question", () => {
+    // Valeurs toutes différentes pour B : s'il crampait, il sortirait de la
+    // rotation et l'alternance un-coup-chacun ne tiendrait plus.
+    let g = game([1, 7, 2, 9, 3, 10, 4, 11, 5, 12, 6, 13, 8]);
+    for (let i = 0; i < 13; i++) g = hit(g);
+    expect(g.players[0].perfect).toBe(true);
+    expect(g.phase).not.toBe("bounty");
   });
 });

@@ -87,7 +87,9 @@ export const laneScore = (runner: RunnerState, brutal = false): number => {
   if (holdsCard(runner, FAUX_DEPART) && !runner.perfect) return 0;
 
   if (!brutal) total = Math.max(0, total);
-  return total + (runner.perfect ? PERFECT_BONUS : 0);
+  // Nuit noire: a runner who turned their Sprint parfait into a strike against
+  // a rival does not also collect the bonus.
+  return total + (runner.perfect && !runner.struck ? PERFECT_BONUS : 0);
 };
 
 /** Highest total among runners still in the game. */

@@ -21,7 +21,7 @@ import process from "node:process";
 import { chromium } from "playwright";
 
 const BASE = process.argv[2] || "http://127.0.0.1:8080/";
-const MAX_STEPS = 1200;
+const MAX_STEPS = 3000;
 // Comfortably longer than the announcement's own countdown, so a slow machine
 // is not mistaken for a stuck popup.
 const PATIENCE_MS = 8000;
@@ -40,9 +40,13 @@ await page.goto(BASE, { waitUntil: "networkidle" });
 await page.evaluate(() => localStorage.clear());
 await page.reload({ waitUntil: "networkidle" });
 await page.getByRole("button", { name: "Solo", exact: true }).click();
-// Six rivals: more action cards drawn per race, so the case under test shows
-// up in a reasonable number of steps.
-await page.getByRole("button", { name: "6", exact: true }).first().click();
+// Two rivals, not six. The announcement only fires when a card is played on
+// THIS runner, and the AI picks its victim among the rivals it can see: the
+// fewer of them there are, the more often that victim is us. Two rather than
+// one so that, once we are whistled out, the other AI keeps the board moving —
+// which is the whole point, since the bug this guards against is a countdown
+// cancelled by a later transition.
+await page.getByRole("button", { name: "2", exact: true }).first().click();
 await page.getByRole("button", { name: /Jouer/ }).click();
 await page.waitForTimeout(500);
 

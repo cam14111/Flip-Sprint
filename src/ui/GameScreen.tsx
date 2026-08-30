@@ -48,6 +48,8 @@ const prompt = (game: GameState, myMove: boolean): string => {
       if (code === SECOND_WIND) return UI.chooseTargetSecondWind;
       return UI.chooseTarget;
     }
+    case "bounty":
+      return myMove ? UI.bountyPrompt : UI.bountyOther(actor.name);
     case "picking": {
       if (!myMove) return UI.chooseTargetOther(actor.name);
       const code = game.pendingAssign?.card.code;
@@ -164,8 +166,14 @@ export const GameScreen = ({
   presence,
   waitingFor,
 }: GameScreenProps) => {
+  // "bounty" is played with the same gesture as "targeting" — touch a lane —
+  // so it shares the whole targeting path. Touching your own keeps the +15,
+  // touching a rival's turns it into a strike.
   const targets = useMemo(
-    () => (game.phase === "targeting" ? legalTargets(game) : []),
+    () =>
+      game.phase === "targeting" || game.phase === "bounty"
+        ? legalTargets(game)
+        : [],
     [game]
   );
   const targeting = targets.length > 0;
@@ -386,7 +394,9 @@ export const GameScreen = ({
           </p>
         ) : targeting ? (
           <p className="py-2 text-center text-xs text-white/45">
-            Touche un couloir pour choisir
+            {game.phase === "bounty"
+              ? UI.bountyHint
+              : "Touche un couloir pour choisir"}
           </p>
         ) : picking ? (
           <p className="py-2 text-center text-xs text-white/45">

@@ -47,6 +47,7 @@ import {
   penaltyValue,
   RELAY,
   RulesetId,
+  PERFECT_BONUS,
   RunnerState,
   SECOND_WIND,
   SQUALL,
@@ -130,6 +131,8 @@ export const createGame = (opts: CreateGameOptions = {}): GameState => {
     burstQueue: [],
     pendingAssign: null,
     mustBank: null,
+    bounty: null,
+    bountyVictim: null,
     deck: cards,
     discard: [],
     round: 1,
@@ -165,6 +168,8 @@ export const dealNextRound = (prev: GameState): GameState => {
     burstQueue: [],
     pendingAssign: null,
     mustBank: null,
+    bounty: null,
+    bountyVictim: null,
     deck: cards,
     discard: [],
     round,
@@ -226,10 +231,23 @@ const targetsFor = (
 export const legalCardPicks = (state: GameState): string[] =>
   legalPicks(state, (code) => targetsFor(state, code, state.actor));
 
-export const legalTargets = (state: GameState): number[] =>
-  state.pendingAssign
+/**
+ * Nuit noire: who a Sprint parfait may be turned against. Anyone still in the
+ * game but its author — a strike lands on a total, so even a cramped rival is
+ * fair game.
+ */
+const bountyTargets = (state: GameState, from: number): number[] =>
+  state.players.flatMap((p, seat) => (p.out || seat === from ? [] : [seat]));
+
+export const legalTargets = (state: GameState): number[] => {
+  if (state.phase === "bounty" && state.bounty !== null) {
+    // Keeping the bonus is choosing yourself, so the author is a target too.
+    return [state.bounty, ...bountyTargets(state, state.bounty)];
+  }
+  return state.pendingAssign
     ? targetsFor(state, state.pendingAssign.card.code, state.actor)
     : [];
+};
 
 /**
  * True when the actor is allowed to catch their breath rather than accelerate.
@@ -335,9 +353,13 @@ const isGameOver = (state: GameState, players: RunnerState[]): boolean => {
 };
 
 export const endRound = (state: GameState): GameState => {
-  const scores = state.players.map((p) =>
-    p.out ? 0 : laneScore(p, state.brutal)
-  );
+  const scores = state.players.map((p, seat) => {
+    if (p.out) return 0;
+    // A strike is taken off the victim's TOTAL, so it rides in as a negative
+    // race score — that keeps every total the plain sum of its races.
+    const strike = seat === state.bountyVictim ? PERFECT_BONUS : 0;
+    return laneScore(p, state.brutal) - strike;
+  });
   // Everything still in flight leaves play too — a Sprint parfait can end the
   // race while cards are set aside or awaiting a target.
   const spent: Card[] = [
@@ -369,6 +391,8 @@ export const endRound = (state: GameState): GameState => {
     burstQueue: [],
     pendingAssign: null,
     mustBank: null,
+    bounty: null,
+    bountyVictim: null,
     phase: "roundOver",
   };
   s = withEvent(s, { type: "roundOver", scores });
@@ -410,8 +434,18 @@ const passTurn = (state: GameState): GameState => {
  * every action card they had set aside.
  */
 const advance = (state: GameState): GameState => {
-  // A Sprint parfait ends the race for everyone, right now.
-  if (state.players.some((p) => p.perfect)) return endRound(state);
+  // A Sprint parfait ends the race for everyone, right now — except under
+  // Nuit noire, where its author first chooses what to do with it.
+  const sprinter = state.players.findIndex((p) => p.perfect);
+  if (sprinter !== -1) {
+    if (state.brutal && state.bounty === null && state.bountyVictim === null) {
+      const victims = bountyTargets(state, sprinter);
+      if (victims.length > 0) {
+        return { ...state, bounty: sprinter, actor: sprinter, phase: "bounty" };
+      }
+    }
+    return endRound(state);
+  }
   if (runningSeats(state.players).length === 0) return endRound(state);
 
   // Mid-resolution: a card is waiting to be handed out or pointed at. The two
@@ -561,6 +595,23 @@ export const reduce = (prev: GameState, action: GameAction): GameState => {
     }
 
     case "assign": {
+      // Nuit noire: the same gesture — point at a runner — settles what a
+      // Sprint parfait is worth. Pointing at yourself keeps the +15.
+      if (state.phase === "bounty" && state.bounty !== null) {
+        if (!legalTargets(state).includes(action.target)) return prev;
+        const author = state.bounty;
+        let s: GameState = { ...state, bounty: null };
+        if (action.target !== author) {
+          s = patchRunner(s, author, (r) => ({ ...r, struck: true }));
+          s = withEvent({ ...s, bountyVictim: action.target }, {
+            type: "struck",
+            seat: action.target,
+            by: author,
+          });
+        }
+        return endRound(s);
+      }
+
       const pending = state.pendingAssign;
       if (state.phase !== "targeting" || !pending) return prev;
       if (!legalTargets(state).includes(action.target)) return prev;

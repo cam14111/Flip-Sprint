@@ -160,6 +160,8 @@ export interface RunnerState {
   status: RunnerStatus;
   /** Reached seven unique numbers — ends the race for everyone. */
   perfect: boolean;
+  /** Nuit noire: gave up their own +15 to take 15 off a rival instead. */
+  struck?: boolean;
   /** Has taken a card on their own turn this race (the opening deal). */
   opened: boolean;
   totalScore: number;
@@ -207,6 +209,8 @@ export type Difficulty = "easy" | "normal" | "hard";
  * "targeting" — the actor must hand out an action card they just drew
  * "picking"   — the actor must point at a card: which one to steal, to make
  *               somebody drop, or to swap (Coups bas only)
+ * "bounty"    — Nuit noire: a Sprint parfait is worth +15 to its author OR
+ *               −15 taken off a rival's total, and the author chooses
  * "roundOver" — the race is scored
  * "gameOver"  — the finish line was crossed
  */
@@ -215,6 +219,7 @@ export const ALL_PHASES = [
   "decide",
   "targeting",
   "picking",
+  "bounty",
   "roundOver",
   "gameOver",
 ] as const;
@@ -265,6 +270,13 @@ export interface GameState {
    * wanted to or not.
    */
   mustBank: number | null;
+  /**
+   * Nuit noire: the runner who has just sprinted perfectly and must choose
+   * between the bonus and a strike. Null the rest of the time.
+   */
+  bounty: number | null;
+  /** The rival that strike lands on, settled when the race is scored. */
+  bountyVictim: number | null;
   deck: Card[];
   discard: Card[];
   /** Race counter within the game (1-based). */
@@ -297,6 +309,7 @@ export type GameEvent =
   | { type: "penalty"; seat: number; value: number; by: number }
   | { type: "coupDeBarre"; seat: number; by: number }
   | { type: "perfect"; seat: number }
+  | { type: "struck"; seat: number; by: number }
   | { type: "banked"; seat: number }
   | { type: "whistled"; seat: number; by: number }
   | { type: "burstStart"; seat: number; by: number }

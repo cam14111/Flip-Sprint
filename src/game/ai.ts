@@ -336,6 +336,19 @@ export const decideAction = (
         type: "assign",
         target: pickTarget(state, seat, legalTargets, policy),
       };
+    case "bounty": {
+      // Nuit noire: +15 for me, or −15 off a rival. Striking is worth it when
+      // somebody is close enough to be worth slowing down; otherwise bank it.
+      if (legalTargets.length === 0) return null;
+      const rivals = legalTargets.filter((t) => t !== seat);
+      if (rivals.length === 0) return { type: "assign", target: seat };
+      const leader = rivals.reduce((top, t) =>
+        state.players[t].totalScore > state.players[top].totalScore ? t : top
+      );
+      const ahead =
+        state.players[leader].totalScore >= state.players[seat].totalScore;
+      return { type: "assign", target: ahead ? leader : seat };
+    }
     case "picking": {
       const ref = pickCard(state, seat);
       return ref === null ? null : { type: "pick", ref };
