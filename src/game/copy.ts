@@ -124,7 +124,10 @@ export const UI = {
   chooseTargetBurst: "Qui prend la rafale ?",
   chooseTargetSecondWind: "À qui donnes-tu ce second souffle ?",
   chooseTargetOther: (name: string) => `${name} choisit une cible`,
-  deferredHint: "Mise de côté pendant la rafale",
+  deferredHint: (ruleset: string) =>
+    ruleset === "coupsbas"
+      ? "Mise de côté pendant la bourrasque"
+      : "Mise de côté pendant la rafale",
 
   // --- A card played on a human runner --------------------------------------
   // A sifflet or a rafale changes what you have to do next, and it arrives on
@@ -160,6 +163,9 @@ export const UI = {
     `Le deuxième ${value} est annulé, la course continue.`,
   whistled: (name: string) => `${name} se fait siffler`,
   burstOn: (name: string) => `Rafale sur ${name}`,
+  /** The forced-draw prompt names the card that caused it. */
+  forcedDraw: (ruleset: string, name: string, left: number) =>
+    `${ruleset === "coupsbas" ? "Bourrasque" : "Rafale"} sur ${name} — ${left} carte${left > 1 ? "s" : ""} à prendre`,
   banked: (name: string, score: number) => `${name} souffle avec ${score} pts`,
   reshuffle: "La défausse est remélangée",
 

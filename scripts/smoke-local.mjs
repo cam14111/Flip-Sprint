@@ -10,8 +10,13 @@
 
 import { chromium } from "playwright";
 
-const BASE = process.argv[2] || "http://127.0.0.1:8080/";
+const BASE =
+  process.argv.slice(2).find((a) => !a.startsWith("--")) ||
+  "http://127.0.0.1:8080/";
 const MAX_STEPS = 600;
+// `--coups-bas` plays the same whole game under the variant's rules, which is
+// the only way to exercise the cards that make you POINT at another card.
+const COUPS_BAS = process.argv.includes("--coups-bas");
 
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_PATH || "/opt/pw-browsers/chromium",
@@ -31,6 +36,9 @@ await page.evaluate(() => localStorage.clear());
 await page.reload({ waitUntil: "networkidle" });
 
 await page.getByRole("button", { name: "À plusieurs" }).click();
+if (COUPS_BAS) {
+  await page.getByRole("button", { name: "Coups bas", exact: true }).click();
+}
 await page.getByRole("button", { name: /Jouer/ }).click();
 await page.waitForTimeout(500);
 
@@ -52,10 +60,12 @@ for (let step = 0; step < MAX_STEPS && !finished; step++) {
     continue;
   }
 
-  // An action card is waiting for a target: take the first legal lane.
-  const target = page.locator('[role="button"][aria-label^="Choisir"]').first();
+  // A card or a lane is waiting to be pointed at: take the first legal one.
+  // Cards are offered as buttons inside a lane, lanes as buttons themselves —
+  // both answer to the same label, so one branch covers targeting and picking.
+  const target = page.locator('[aria-label^="Choisir"]').first();
   if (await target.count()) {
-    await target.click();
+    await target.click({ timeout: 5000 }).catch(() => undefined);
     await page.waitForTimeout(90);
     continue;
   }
@@ -100,4 +110,6 @@ if (problems.length > 0) {
   for (const p of problems) console.error(" -", p);
   process.exit(1);
 }
-console.log(`smoke ok — ${races} courses jusqu'à la ligne d'arrivée`);
+console.log(
+  `smoke ok (${COUPS_BAS ? "Coups bas" : "classique"}) — ${races} courses jusqu'à la ligne d'arrivée`
+);

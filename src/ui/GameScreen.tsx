@@ -35,7 +35,7 @@ const prompt = (game: GameState, myMove: boolean): string => {
   switch (game.phase) {
     case "draw":
       if (game.burstLeft > 0) {
-        return `Rafale sur ${actor.name} — ${game.burstLeft} carte${game.burstLeft > 1 ? "s" : ""} à prendre`;
+        return UI.forcedDraw(game.ruleset, actor.name, game.burstLeft);
       }
       return myMove ? UI.openingDraw : UI.openingDrawOther(actor.name);
     case "decide":
@@ -362,7 +362,9 @@ export const GameScreen = ({
         >
           {prompt(game, myMove)}
           {game.pendingAssign?.deferred && (
-            <span className="ml-1 text-white/40">({UI.deferredHint})</span>
+            <span className="ml-1 text-white/40">
+              ({UI.deferredHint(game.ruleset)})
+            </span>
           )}
         </p>
 

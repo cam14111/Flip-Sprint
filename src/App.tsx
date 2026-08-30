@@ -267,7 +267,7 @@ const AppInner = () => {
 
       {panel === "rules" && (
         <Panel title={UI.rules} onClose={closeSubPanel}>
-          <Rules />
+          <Rules ruleset={settings.ruleset} />
         </Panel>
       )}
       {panel === "settings" && (

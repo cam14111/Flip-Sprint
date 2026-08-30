@@ -14,6 +14,7 @@
     "e2e:online": "node scripts/e2e-online.mjs",
     "e2e:online:fast": "node scripts/e2e-online.mjs --fast",
     "smoke": "node scripts/smoke-local.mjs",
+    "smoke:coupsbas": "node scripts/smoke-local.mjs --coups-bas",
     "check:notch": "node scripts/check-notch.mjs",
     "check:alerts": "node scripts/check-alerts.mjs",
     "build:rules": "node scripts/build-rules.mjs",
