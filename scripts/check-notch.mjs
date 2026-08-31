@@ -87,44 +87,79 @@ try {
   await page.evaluate(() => localStorage.clear());
   await page.reload({ waitUntil: "networkidle" });
 
-  const root = parse(
-    await page.evaluate(
-      () => getComputedStyle(document.documentElement).backgroundColor
-    )
-  );
-  console.log(`\nfond du document (ce que l'OS peint) : ${hex(root)}`);
-
-  // --- The colour the OS paints must match the top of the board ------------
-  console.log("\nraccord avec le haut de l'écran");
-  const topOf = async (label) => {
+  /** The colour actually painted at the very top of the screen. */
+  const topPixel = async () => {
     const png = await page.screenshot({
       clip: { x: 195, y: 0, width: 1, height: 1 },
     });
-    const rgb = decode(png);
-    const d = distance(rgb, root);
-    check(d <= SEAM, `${label} : ${hex(rgb)}, écart ${d}`);
+    return decode(png);
   };
 
-  await topOf("accueil");
-  await page.getByRole("button", { name: "Solo", exact: true }).click();
-  await page.getByRole("button", { name: /Jouer/ }).click();
-  await page.waitForTimeout(600);
-  await topOf("plateau");
+  const rootColour = async () =>
+    parse(
+      await page.evaluate(
+        () => getComputedStyle(document.documentElement).backgroundColor
+      )
+    );
 
-  // --- And the declared colours must agree with it -------------------------
-  // The meta tag colours the browser toolbar, the manifest colours the splash
-  // and the task switcher. Three places, one colour: drift in any of them puts
-  // the band back on a different surface.
-  console.log("\ncouleurs déclarées");
-  const meta = await page.getAttribute('meta[name="theme-color"]', "content");
-  check(
-    meta !== null && distance(fromHex(meta), root) === 0,
-    `meta theme-color = ${meta}`
-  );
+  /**
+   * One ambiance, checked end to end: the colour the OS would paint has to
+   * meet the colour the app paints beside it, on the home screen AND on the
+   * board, and the browser's own toolbar has to be told the same thing.
+   */
+  const ambiance = async (label, arrange) => {
+    console.log(`\n${label}`);
+    await page.goto(BASE, { waitUntil: "networkidle" });
+    await arrange();
+    await page.waitForTimeout(250);
 
-  // The plugin only injects the manifest into a production build, so in dev we
-  // fall back to the last build on disk. Absent both, say so rather than pass
-  // quietly — a skipped check that reads as green is worse than no check.
+    const root = await rootColour();
+    const home = await topPixel();
+    check(
+      distance(home, root) <= SEAM,
+      `accueil : peint ${hex(home)}, fond ${hex(root)}, écart ${distance(home, root)}`
+    );
+
+    const meta = await page.getAttribute('meta[name="theme-color"]', "content");
+    check(
+      meta !== null && distance(fromHex(meta), root) === 0,
+      `barre du navigateur accordée (${meta})`
+    );
+
+    await page.getByRole("button", { name: /Jouer/ }).click();
+    await page.waitForTimeout(600);
+    const board = await topPixel();
+    check(
+      distance(board, root) <= SEAM,
+      `plateau : peint ${hex(board)}, écart ${distance(board, root)}`
+    );
+  };
+
+  await ambiance("règles classiques", async () => {
+    await page.getByRole("button", { name: "Solo", exact: true }).click();
+  });
+
+  await ambiance("Coups bas", async () => {
+    await page.getByRole("button", { name: "Solo", exact: true }).click();
+    await page.getByRole("button", { name: "Coups bas", exact: true }).click();
+  });
+
+  await ambiance("Coups bas · Nuit noire", async () => {
+    await page.getByRole("button", { name: "Solo", exact: true }).click();
+    await page.getByRole("button", { name: "Coups bas", exact: true }).click();
+    await page.getByRole("button", { name: /Nuit noire/ }).click();
+  });
+
+  // --- The manifest ---------------------------------------------------------
+  // It is a static file, so it can only carry one colour: the one the app opens
+  // on. It paints the splash and the task switcher, both of which come before
+  // any ruleset has been chosen.
+  console.log("\ncouleurs du manifeste");
+  await page.goto(BASE, { waitUntil: "networkidle" });
+  await page.evaluate(() => localStorage.clear());
+  await page.reload({ waitUntil: "networkidle" });
+  const opening = await rootColour();
+
   const link = page.locator('link[rel="manifest"]');
   const manifest = (await link.count())
     ? await page.evaluate(
@@ -139,7 +174,7 @@ try {
     for (const key of ["theme_color", "background_color"]) {
       const value = manifest[key] ?? "";
       check(
-        value.toLowerCase() === hex(root).toLowerCase(),
+        value.toLowerCase() === hex(opening).toLowerCase(),
         `manifest ${key} = ${value}`
       );
     }

@@ -54,7 +54,13 @@ const CardRow = ({ code }: { code: CardCode }) => (
   </div>
 );
 
-export const Rules = ({ ruleset = "classique" }: { ruleset?: RulesetId }) => (
+export const Rules = ({
+  ruleset = "classique",
+  brutal = false,
+}: {
+  ruleset?: RulesetId;
+  brutal?: boolean;
+}) => (
   <div className="mx-auto max-w-md">
     <Section title="Le principe">
       <p>
@@ -79,11 +85,38 @@ export const Rules = ({ ruleset = "classique" }: { ruleset?: RulesetId }) => (
         Les autres gardent ce qu'ils avaient.
       </p>
       <div className="flex flex-wrap gap-1 pt-1">
-        {[2, 5, 9, 11, 0, 7, 12].map((code) => (
+        {(ruleset === "coupsbas"
+          ? [1, 3, 5, 8, 11, 13, DOSSARD_FETICHE]
+          : [2, 5, 9, 11, 0, 7, 12]
+        ).map((code) => (
           <Card key={code} code={code} size="xs" />
         ))}
       </div>
+      {ruleset === "coupsbas" && (
+        <p className="text-[13px] text-white/55">
+          Compte bien <strong className="text-white">sept cartes</strong>, pas
+          sept valeurs : ci-dessus il n'y a que six numéros différents, mais le{" "}
+          <Inline code={DOSSARD_FETICHE} /> autorise le second{" "}
+          <Inline code={13} /> et les deux comptent.
+        </p>
+      )}
     </Section>
+
+    {ruleset === "coupsbas" && (
+      <Section title="Souffler ne met plus à l'abri">
+        <p>
+          C'est le changement qui pèse le plus lourd. Un coureur qui s'est
+          arrêté <strong className="text-white">garde ses cartes sur la
+          table</strong> : on peut encore lui coller une pénalité, lui voler une
+          carte, lui en faire lâcher une — et il peut{" "}
+          <strong className="text-rose-300">cramper après coup</strong>.
+        </p>
+        <p>
+          Seul un couloir déjà crampé est hors de portée. S'arrêter tôt ne
+          protège plus rien : ça arrête seulement de piocher.
+        </p>
+      </Section>
+    )}
 
     <Section
       title={
@@ -135,11 +168,18 @@ export const Rules = ({ ruleset = "classique" }: { ruleset?: RulesetId }) => (
           <CardRow code={STUMBLE} />
           <CardRow code={RELAY} />
           <p className="pt-1 text-[13px] text-white/55">
-            Elles atteignent aussi un coureur qui a{" "}
-            <strong className="text-white">déjà soufflé</strong> : ici, s'arrêter
-            ne met plus à l'abri. Seul un couloir crampé est hors de portée.
             Tirées <em className="not-italic text-white/75">pendant</em> une
-            bourrasque, elles sont mises de côté et résolues à la fin.
+            bourrasque, elles sont mises de côté et résolues seulement à la fin
+            — et perdues si la cible crampe entre-temps.
+          </p>
+          <p className="text-[13px] text-white/55">
+            Le <Inline code={RELAY} /> échange les deux cartes{" "}
+            <strong className="text-white">d'un seul coup</strong>, puis
+            recalcule les deux couloirs : un seul Relais peut faire{" "}
+            <strong className="text-rose-300">cramper les deux coureurs</strong>{" "}
+            à la fois. Et une carte volée ou échangée arrive comme une vraie
+            carte piochée : elle peut te faire cramper, et{" "}
+            <Inline code={LE_MUR} /> vide le couloir de qui le récupère.
           </p>
         </>
       ) : (
@@ -213,6 +253,29 @@ export const Rules = ({ ruleset = "classique" }: { ruleset?: RulesetId }) => (
         </>
       )}
     </Section>
+
+    {ruleset === "coupsbas" && brutal && (
+      <Section title="Nuit noire">
+        <p>
+          Trois règles de plus, pour ceux qui trouvaient que ce n'était pas
+          encore assez méchant.
+        </p>
+        <p>
+          Un score de course peut passer{" "}
+          <strong className="text-rose-300">sous zéro</strong> — le plancher
+          saute. Une pénalité peut être collée à un couloir{" "}
+          <strong className="text-white">déjà crampé</strong>, et elle comptera.
+        </p>
+        <p>
+          Et un sprint parfait te pose une question : garder tes{" "}
+          <strong className="text-amber-300">+{PERFECT_BONUS}</strong>, ou y
+          renoncer pour retirer{" "}
+          <strong className="text-rose-300">{PERFECT_BONUS} points</strong> du
+          total d'un rival. Touche ton couloir pour encaisser, celui d'un rival
+          pour frapper.
+        </p>
+      </Section>
+    )}
 
     <Section title="Gagner">
       <p>

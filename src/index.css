@@ -46,14 +46,23 @@
      camera cutout or status bar, and the overscroll gutter.
 
      It has to match what the app paints AT THE TOP of the screen, not the
-     average of the track — the eye reads the seam, not the absolute value.
-     The gradient below starts at #251056 up there, which is much lighter than
-     the deep indigo of the rest; a base picked from the bottom of the track
-     showed as a black band under the notch. Kept in step with the manifest's
-     theme/background colour and the theme-color meta tag. */
-  html {
-    background-color: #251056;
+     average of the track — the eye reads the seam, not the absolute value. A
+     base picked from the bottom of the track showed as a black band under the
+     notch. It lives in one custom property so the root colour, the gradient it
+     has to meet and the theme-color meta tag cannot drift apart; the meta tag
+     is set from this very value at runtime, and `npm run check:notch` measures
+     the actual pixels for every ambiance. */
+  :root {
+    --sky: #251056;
+    /* Sheets that sit above the board — rules, settings, the race recap. One
+       shade above the track so they read as a surface, and fully opaque: at
+       97% the home screen's cyan chips glowed straight through the text. */
+    --panel: #180c3a;
   }
+  html {
+    background-color: var(--sky);
+  }
+
   body {
     @apply text-foreground;
     margin: 0;
@@ -71,6 +80,39 @@
     background-attachment: fixed;
     background-repeat: no-repeat;
   }
+}
+
+/* ---- Ambiances -----------------------------------------------------------
+   Coups bas is a nastier game, and the table says so before a card is dealt:
+   the same night track, lower and colder. Nuit noire goes further still, down
+   to something barely lit.
+
+   Each ambiance moves the gradient AND `--sky` together, because they meet
+   under the notch and any gap between them reads as a black band. The values
+   below are not guessed: they are what `npm run check:notch` measures at the
+   top of the screen, and it fails the build of the eye if they drift. */
+:root[data-ambiance="coupsbas"] {
+  --sky: #1c0a3f;
+  --panel: #140832;
+}
+:root[data-ambiance="coupsbas"] body {
+  background:
+    radial-gradient(1100px 560px at 50% -10%, #1f0b46 0%, transparent 62%),
+    radial-gradient(820px 480px at 100% 104%, #3d0d34 0%, transparent 58%),
+    radial-gradient(700px 420px at 0% 96%, #05202e 0%, transparent 55%),
+    linear-gradient(165deg, #0d0620 0%, #090418 58%, #060310 100%);
+}
+
+:root[data-ambiance="nuitnoire"] {
+  --sky: #100526;
+  --panel: #0c0420;
+}
+:root[data-ambiance="nuitnoire"] body {
+  background:
+    radial-gradient(1100px 560px at 50% -10%, #14062c 0%, transparent 62%),
+    radial-gradient(820px 480px at 100% 104%, #26071f 0%, transparent 58%),
+    radial-gradient(700px 420px at 0% 96%, #03131c 0%, transparent 55%),
+    linear-gradient(165deg, #07030f 0%, #050209 58%, #030106 100%);
 }
 
 /* App containers stay transparent so the single fixed root gradient shows

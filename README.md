@@ -139,6 +139,14 @@ téléphone. Trois endroits doivent rester alignés : `html { background-color }
 `npm run check:notch` mesure les pixels réellement peints et refuse un écart
 visible, plutôt que de faire confiance à la feuille de style.
 
+**Les trois ambiances.** Coups bas assombrit le plateau, Nuit noire davantage
+encore : le jeu annonce sa couleur avant la première carte. Chaque ambiance
+déplace le dégradé **et** la couleur de racine ensemble — elles se rejoignent
+sous l'encoche — via une seule variable, `--sky`, dont la balise
+`theme-color` est relue à l'exécution plutôt que recopiée. La sonde vérifie
+les trois. Le manifeste, lui, est un fichier statique : il ne peut porter
+qu'une couleur, celle sur laquelle l'application s'ouvre.
+
 ## Mode en ligne
 
 ### Comment ça marche

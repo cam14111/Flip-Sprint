@@ -13,6 +13,7 @@ import {
   Settings,
 } from "./game/settings";
 import { loadStats, resetStats, Stats } from "./game/stats";
+import { RulesetId } from "./game/types";
 import { loadOnlineSession } from "./online/session";
 import { useGame } from "./hooks/useGame";
 import { setHapticsEnabled } from "./lib/haptics";
@@ -23,6 +24,7 @@ import { Overlays } from "./ui/Overlays";
 import { Home } from "./ui/screens/Home";
 import { Panel } from "./ui/screens/Panel";
 import { Rules } from "./ui/screens/Rules";
+import { useAmbiance } from "./ui/ambiance";
 import { SettingsScreen } from "./ui/screens/SettingsScreen";
 import { StatsScreen } from "./ui/screens/StatsScreen";
 
@@ -106,6 +108,15 @@ const AppInner = () => {
 
   const [onlineIntent, setOnlineIntent] = useState<OnlineIntent>(opening.intent);
   const [screen, setScreen] = useState<Screen>(opening.screen);
+  /**
+   * The rules of the online game actually being played, once the lobby is
+   * known. A guest who joined by link may have quite different settings saved,
+   * and it is the table they are sitting at that should light the screen.
+   */
+  const [liveRules, setLiveRules] = useState<{
+    ruleset: RulesetId;
+    brutal: boolean;
+  } | null>(null);
   const [panel, setPanel] = useState<PanelKind>(null);
   const [panelOrigin, setPanelOrigin] = useState<"home" | "menu">("home");
   const [hasSaved, setHasSaved] = useState(restored !== null);
@@ -126,6 +137,13 @@ const AppInner = () => {
   useEffect(() => {
     document.documentElement.classList.add("dark");
   }, []);
+
+  // An online guest plays the host's rules, not their own saved preference, so
+  // the lobby has the last word on how the table is lit.
+  useAmbiance(
+    liveRules?.ruleset ?? settings.ruleset,
+    liveRules?.brutal ?? settings.brutal
+  );
 
   useEffect(() => {
     setSoundEnabled(settings.sound);
@@ -176,6 +194,7 @@ const AppInner = () => {
         settings={settings}
         onChange={patchSettings}
         intent={onlineIntent}
+        onRules={setLiveRules}
         onExit={goHome}
       />
     );
@@ -267,7 +286,7 @@ const AppInner = () => {
 
       {panel === "rules" && (
         <Panel title={UI.rules} onClose={closeSubPanel}>
-          <Rules ruleset={settings.ruleset} />
+          <Rules ruleset={settings.ruleset} brutal={settings.brutal} />
         </Panel>
       )}
       {panel === "settings" && (

@@ -75,7 +75,7 @@ const Sheet = ({
 }) => (
   <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/70 px-3 pb-3 backdrop-blur-sm sm:items-center">
     <div
-      className="animate-board-in w-full max-w-md rounded-3xl bg-[#180c3a] p-4 shadow-2xl ring-1 ring-white/10"
+      className="animate-board-in w-full max-w-md rounded-3xl bg-[var(--panel)] p-4 shadow-2xl ring-1 ring-white/10"
       style={{ marginBottom: "env(safe-area-inset-bottom)" }}
       role="dialog"
       aria-modal="true"

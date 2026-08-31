@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { UI } from "@/game/copy";
 import { displayName, RACE_MODES, Settings } from "@/game/settings";
+import { RulesetId } from "@/game/types";
 import type { OnlineErrorCode, OnlinePlayerMeta } from "@/online/client";
 import { MAX_PLAYERS, MIN_PLAYERS } from "@/online/protocol";
 import { loadOnlineSession } from "@/online/session";
@@ -126,6 +127,12 @@ export interface OnlineModeProps {
   settings: Settings;
   onChange: (patch: Partial<Settings>) => void;
   intent: OnlineIntent;
+  /**
+   * Reports the rules the lobby is actually being played under, so the app can
+   * light itself accordingly. A guest who joined by link may have quite
+   * different settings saved: the table wins.
+   */
+  onRules?: (rules: { ruleset: RulesetId; brutal: boolean }) => void;
   onExit: () => void;
 }
 
@@ -133,6 +140,7 @@ export const OnlineMode = ({
   settings,
   onChange,
   intent,
+  onRules,
   onExit,
 }: OnlineModeProps) => {
   const online = useOnlineGame();
@@ -141,6 +149,13 @@ export const OnlineMode = ({
   const [copied, setCopied] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const me = displayName(settings.playerName);
+
+  const lobbyRuleset = snap?.ruleset;
+  const lobbyBrutal = snap?.brutal;
+  useEffect(() => {
+    if (lobbyRuleset === undefined) return;
+    onRules?.({ ruleset: lobbyRuleset, brutal: lobbyBrutal ?? false });
+  }, [lobbyRuleset, lobbyBrutal, onRules]);
 
   // Act on the intent that brought us here — an invite link, or a race this
   // device was already part of. Guarded by a ref rather than by the dependency

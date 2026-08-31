@@ -13,7 +13,7 @@ export const Panel = ({
   children: ReactNode;
 }) => (
   <div
-    className="fixed inset-0 z-40 flex flex-col bg-[#12082e]/97 backdrop-blur"
+    className="fixed inset-0 z-40 flex flex-col bg-[var(--panel)]"
     style={{
       paddingTop: "env(safe-area-inset-top)",
       paddingBottom: "env(safe-area-inset-bottom)",

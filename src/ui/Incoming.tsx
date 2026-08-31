@@ -130,7 +130,7 @@ export const Incoming = ({
       onClick={dismiss}
     >
       <div
-        className="animate-board-in flex w-full max-w-xs flex-col items-center gap-3 rounded-3xl bg-[#180c3a] p-5 text-center"
+        className="animate-board-in flex w-full max-w-xs flex-col items-center gap-3 rounded-3xl bg-[var(--panel)] p-5 text-center"
         style={{
           boxShadow: `0 0 0 1px ${skin.glow}55, 0 24px 70px -12px ${skin.glow}55`,
         }}
