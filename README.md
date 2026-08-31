@@ -79,7 +79,7 @@ un couloir déjà crampé, et un **Sprint parfait pose une question** — garder
 
 - **Moteur de jeu pur et testé** (`src/game/`) : toutes les règles vivent dans
   un réducteur pur, sans React, sans timer et sans hasard ambiant. Couvert par
-  138 tests, dont plus de 1400 parties aléatoires de 2 à 8 coureurs — sous les
+  148 tests, dont plus de 1400 parties aléatoires de 2 à 8 coureurs — sous les
   deux jeux de règles — qui vérifient à chaque transition la conservation des
   cartes, l'absence de doublon dans un couloir, la terminaison et le
   déterminisme.
@@ -268,12 +268,12 @@ npm run dev            # http://localhost:8080
 ### Vérifier
 
 ```sh
-npm test               # moteur, IA, rejeu — 138 tests
+npm test               # moteur, IA, rejeu — 148 tests
 npm run lint
 npm run build          # typecheck + build de production
 npm run smoke          # joue une partie locale entière dans un vrai navigateur
 npm run smoke:coupsbas # la même chose sous les règles Coups bas
-npm run check:notch    # la zone derrière l'encoche se raccorde-t-elle au plateau ?
+npm run check:notch    # les trois ambiances se raccordent-elles sous l'encoche ?
 npm run check:alerts   # l'annonce d'une carte subie se referme-t-elle seule ?
 npm run test:rules     # sondes de sécurité contre l'émulateur
 npm run e2e:online     # deux navigateurs, une vraie course en ligne (14 vérifs)
